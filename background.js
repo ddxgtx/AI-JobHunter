@@ -55,7 +55,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       .then(result => sendResponse({ success: true, ...result }))
       .catch(err => sendResponse({ success: false, error: err.message }));
     return true;
-    }
+  }
 
   if (request.action === 'interviewPrep') {
     handleInterviewPrep(request.jd)
@@ -400,9 +400,10 @@ ${JSON.stringify(pageFields, null, 2)}
 4. 对于明显不相关的字段(如验证码、图片上传、搜索框)跳过，不要包含在结果中
 5. 如果字段 label 含"期望"且涉及薪资，使用 r_salary 值
 6. 如果字段 label 含"期望"且涉及城市/地点，使用 r_city 值
-7. 只输出 JSON 数组，不要输出任何解释文字`;
+7. 只输出 JSON 数组，不要输出任何解释文字
+8. 如果简历中有 r_industry（行业）字段，请在匹配时也考虑行业相关字段的语义`;
 
-  const result = await callAPI(config, prompt + '\n\n注意：如果简历中有 r_industry（行业）字段，请在匹配时也考虑行业相关字段的语义。');
+  const result = await callAPI(config, prompt);
   try {
     const jsonStr = result.match(/\[[\s\S]*\]/)?.[0] || result;
     return JSON.parse(jsonStr);
