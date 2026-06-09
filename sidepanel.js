@@ -964,6 +964,226 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // ====== Jobs Management ======
+  const jobsList = $('jobsList');
+  const jobsCount = $('jobsCount');
+  const jobsFilterToggle = $('jobsFilterToggle');
+  const jobsFilterPanel = $('jobsFilterPanel');
+  const jobsFilterArrow = $('jobsFilterArrow');
+  const exportJobsBtn = $('exportJobs');
+  const clearJobsBtn = $('clearJobs');
+  let currentFilter = 'all';
+
+  // 初始化职位管理
+  function initJobs() {
+    // 筛选面板切换
+    if (jobsFilterToggle) {
+      jobsFilterToggle.addEventListener('click', () => {
+        const isOpen = jobsFilterPanel.style.display !== 'none';
+        jobsFilterPanel.style.display = isOpen ? 'none' : 'block';
+        if (jobsFilterArrow) jobsFilterArrow.classList.toggle('open', !isOpen);
+      });
+    }
+
+    // 筛选标签点击
+    document.querySelectorAll('.jobs-filter-tag').forEach(tag => {
+      tag.addEventListener('click', () => {
+        document.querySelectorAll('.jobs-filter-tag').forEach(t => t.classList.remove('active'));
+        tag.classList.add('active');
+        currentFilter = tag.dataset.status;
+        loadJobs();
+      });
+    });
+
+    // 导出按钮
+    if (exportJobsBtn) {
+      exportJobsBtn.addEventListener('click', exportJobs);
+    }
+
+    // 清空按钮
+    if (clearJobsBtn) {
+      clearJobsBtn.addEventListener('click', clearJobs);
+    }
+
+    // 加载职位列表
+    loadJobs();
+  }
+
+  // 加载职位列表
+  function loadJobs() {
+    chrome.storage.local.get(['savedJobs'], data => {
+      const jobs = data.savedJobs || [];
+      
+      // 更新计数
+      if (jobsCount) {
+        jobsCount.textContent = jobs.length + ' 条记录';
+      }
+
+      // 筛选
+      const filtered = currentFilter === 'all' ? jobs : jobs.filter(j => j.status === currentFilter);
+
+      if (!filtered.length) {
+        jobsList.innerHTML = '<div class="jobs-empty">' + (jobs.length ? '当前筛选无结果' : '暂无收藏职位') + '</div>';
+        return;
+      }
+
+      const statusMap = {
+        saved: '待投递',
+        applied: '已投递',
+        interview: '面试中',
+        offer: '已录取',
+        rejected: '已拒绝'
+      };
+
+      jobsList.innerHTML = filtered.map((job, i) => {
+        const d = new Date(job.time);
+        const ts = d.toLocaleDateString('zh-CN');
+        return `<div class="job-item" data-idx="${i}">
+          <div class="job-item-header">
+            <div class="job-item-title">${esc(job.position || '未知职位')}</div>
+            <span class="job-item-status ${job.status}">${statusMap[job.status] || '待投递'}</span>
+          </div>
+          <div class="job-item-company">${esc(job.company || '未知公司')}</div>
+          <div class="job-item-info">
+            ${job.salary ? '<span>' + esc(job.salary) + '</span>' : ''}
+            ${job.location ? '<span>' + esc(job.location) + '</span>' : ''}
+            <span>${ts}</span>
+          </div>
+          <div class="job-item-actions">
+            <button class="status-btn" data-status="applied">已投递</button>
+            <button class="status-btn" data-status="interview">面试中</button>
+            <button class="status-btn" data-status="offer">已录取</button>
+            <button class="delete" data-action="delete">删除</button>
+          </div>
+        </div>`;
+      }).join('');
+
+      // 绑定事件
+      jobsList.querySelectorAll('.job-item').forEach(el => {
+        const idx = parseInt(el.dataset.idx);
+        
+        // 状态按钮
+        el.querySelectorAll('.status-btn').forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            updateJobStatus(idx, btn.dataset.status);
+          });
+        });
+
+        // 删除按钮
+        el.querySelector('.delete').addEventListener('click', (e) => {
+          e.stopPropagation();
+          deleteJob(idx);
+        });
+
+        // 点击查看详情
+        el.addEventListener('click', () => {
+          const job = filtered[idx];
+          if (job?.url) {
+            chrome.tabs.create({ url: job.url });
+          }
+        });
+      });
+    });
+  }
+
+  // 更新职位状态
+  function updateJobStatus(index, status) {
+    chrome.storage.local.get(['savedJobs'], data => {
+      const jobs = data.savedJobs || [];
+      if (jobs[index]) {
+        jobs[index].status = status;
+        jobs[index].updatedTime = Date.now();
+        chrome.storage.local.set({ savedJobs: jobs }, () => {
+          loadJobs();
+          toast($('greetStatus'), '状态已更新', 'ok');
+        });
+      }
+    });
+  }
+
+  // 删除职位
+  function deleteJob(index) {
+    chrome.storage.local.get(['savedJobs'], data => {
+      const jobs = data.savedJobs || [];
+      jobs.splice(index, 1);
+      chrome.storage.local.set({ savedJobs: jobs }, () => {
+        loadJobs();
+        toast($('greetStatus'), '已删除', 'ok');
+      });
+    });
+  }
+
+  // 导出职位数据
+  function exportJobs() {
+    chrome.storage.local.get(['savedJobs'], data => {
+      const jobs = data.savedJobs || [];
+      if (!jobs.length) {
+        toast($('greetStatus'), '没有可导出的数据', 'err');
+        return;
+      }
+      const statusMap = { saved: '待投递', applied: '已投递', interview: '面试中', offer: '已录取', rejected: '已拒绝' };
+      const lines = jobs.map(job => {
+        const d = new Date(job.time);
+        const ts = d.toLocaleDateString('zh-CN') + ' ' + d.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+        return `【${statusMap[job.status] || '待投递'}】${ts}\n职位: ${job.position || ''}\n公司: ${job.company || ''}\n薪资: ${job.salary || ''}\n地点: ${job.location || ''}\n链接: ${job.url || ''}\n`;
+      });
+      const blob = new Blob(['AI-JobHunter - 职位收藏\n' + '='.repeat(40) + '\n\n' + lines.join('\n')], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'jobs-' + new Date().toISOString().slice(0, 10) + '.txt';
+      a.click();
+      URL.revokeObjectURL(url);
+      toast($('greetStatus'), '已导出 ' + jobs.length + ' 条记录', 'ok');
+    });
+  }
+
+  // 清空职位数据
+  function clearJobs() {
+    if (confirm('确定要清空所有收藏的职位吗？此操作不可撤销。')) {
+      chrome.storage.local.set({ savedJobs: [] }, () => {
+        loadJobs();
+        toast($('greetStatus'), '已清空', 'ok');
+      });
+    }
+  }
+
+  // 保存职位（供 content.js 调用）
+  function saveJob(jobInfo) {
+    return new Promise((resolve, reject) => {
+      chrome.storage.local.get(['savedJobs'], data => {
+        const jobs = data.savedJobs || [];
+        
+        // 检查是否已存在
+        const exists = jobs.some(j => j.url === jobInfo.url || (j.position === jobInfo.position && j.company === jobInfo.company));
+        if (exists) {
+          reject(new Error('该职位已收藏'));
+          return;
+        }
+
+        // 添加新职位
+        jobs.unshift({
+          ...jobInfo,
+          status: 'saved',
+          time: Date.now(),
+          updatedTime: Date.now()
+        });
+
+        // 限制数量
+        const limitedJobs = jobs.slice(0, 200);
+        
+        chrome.storage.local.set({ savedJobs: limitedJobs }, () => {
+          loadJobs();
+          resolve();
+        });
+      });
+    });
+  }
+
+  // 初始化
+  initJobs();
+
   // ====== Helpers ======
   function getConfig() {
     return new Promise(resolve => {

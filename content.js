@@ -26,6 +26,7 @@
     extract: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="' + ACCENT + '" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8"/><path d="M16 17H8"/><path d="M10 9H8"/></svg>',
     fill: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="' + ACCENT + '" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>',
     sidebar: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="' + ACCENT + '" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="15" y1="3" x2="15" y2="21"/></svg>',
+    bookmark: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="' + ACCENT + '" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>',
     check: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#34c759" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>',
     error: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ff3b30" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>',
     loading: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="' + ACCENT + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>',
@@ -94,6 +95,15 @@
       '<div class="ai-jh-btn-text"><div class="ai-jh-btn-title">获取当前页面 JD</div>' +
       '<div class="ai-jh-btn-desc">提取职位描述并预览</div></div>';
     btnGroup.appendChild(extractBtn);
+
+    // 收藏职位按钮
+    var saveJobBtn = document.createElement('button');
+    saveJobBtn.className = 'ai-jh-btn';
+    saveJobBtn.id = 'ai-jh-save-job';
+    saveJobBtn.innerHTML = '<div class="ai-jh-btn-icon">' + icons.bookmark + '</div>' +
+      '<div class="ai-jh-btn-text"><div class="ai-jh-btn-title">收藏当前职位</div>' +
+      '<div class="ai-jh-btn-desc">保存到职位管理</div></div>';
+    btnGroup.appendChild(saveJobBtn);
 
     // AI 填写简历按钮
     var fillBtn = document.createElement('button');
@@ -243,6 +253,11 @@
     // 获取 JD 按钮
     document.getElementById('ai-jh-extract').addEventListener('click', function() {
       extractJD();
+    });
+
+    // 收藏职位按钮
+    document.getElementById('ai-jh-save-job').addEventListener('click', function() {
+      saveCurrentJob();
     });
 
     // AI 填写按钮
@@ -477,6 +492,85 @@
     var btn = document.getElementById('ai-jh-fill');
     btn.classList.remove('loading');
     btn.querySelector('.ai-jh-btn-icon').innerHTML = icons.fill;
+  }
+
+  // ====== 收藏职位 ======
+  function saveCurrentJob() {
+    var btn = document.getElementById('ai-jh-save-job');
+    btn.classList.add('loading');
+    btn.querySelector('.ai-jh-btn-icon').innerHTML = icons.loading;
+
+    // 获取当前 tab
+    chrome.tabs.query({ active: true, currentWindow: true }, function(tabs) {
+      if (!tabs[0]) {
+        showToast('无法获取当前页面', 'error');
+        resetSaveJobBtn();
+        return;
+      }
+
+      var tabId = tabs[0].id;
+      var url = tabs[0].url;
+
+      // 提取职位信息
+      chrome.scripting.executeScript({ target: { tabId: tabId }, func: extractJobInfo }).then(function(results) {
+        var jobInfo = results?.[0]?.result || {};
+        
+        if (!jobInfo.position && !jobInfo.company) {
+          showToast('未检测到职位信息', 'error');
+          resetSaveJobBtn();
+          return;
+        }
+
+        // 保存到 storage
+        chrome.storage.local.get(['savedJobs'], function(data) {
+          var jobs = data.savedJobs || [];
+          
+          // 检查是否已存在
+          var exists = jobs.some(function(j) {
+            return j.url === url || (j.position === jobInfo.position && j.company === jobInfo.company);
+          });
+          
+          if (exists) {
+            showToast('该职位已收藏', 'info');
+            resetSaveJobBtn();
+            return;
+          }
+
+          // 添加新职位
+          jobs.unshift({
+            position: jobInfo.position || '',
+            company: jobInfo.company || '',
+            salary: jobInfo.salary || '',
+            location: jobInfo.location || '',
+            experience: jobInfo.experience || '',
+            education: jobInfo.education || '',
+            url: url,
+            status: 'saved',
+            time: Date.now(),
+            updatedTime: Date.now()
+          });
+
+          // 限制数量
+          if (jobs.length > 200) {
+            jobs = jobs.slice(0, 200);
+          }
+
+          chrome.storage.local.set({ savedJobs: jobs }, function() {
+            showToast('已收藏: ' + (jobInfo.position || '未知职位'), 'success');
+            resetSaveJobBtn();
+          });
+        });
+      }).catch(function(err) {
+        showToast('提取失败: ' + err.message, 'error');
+        resetSaveJobBtn();
+      });
+    });
+  }
+
+  function resetSaveJobBtn() {
+    var btn = document.getElementById('ai-jh-save-job');
+    btn.classList.remove('loading');
+    btn.querySelector('.ai-jh-btn-icon').innerHTML = icons.bookmark;
   }
 
   // ======================================================================
