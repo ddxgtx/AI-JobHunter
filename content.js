@@ -150,12 +150,15 @@
 
   // ====== 绑定事件 ======
   function bindEvents() {
-    // 拖拽相关变量
-    var dragging = false, startX, startY, startLeft, startBottom, moved = false;
+    // 浮动按钮拖拽变量
+    var fabDragging = false, fabStartX, fabStartY, fabStartLeft, fabStartBottom, fabMoved = false;
+    
+    // 标题栏拖拽变量
+    var headerDragging = false, headerStartX, headerStartY, headerStartLeft, headerStartBottom, headerMoved = false;
 
     // 浮动按钮点击
     fab.addEventListener('click', function(e) {
-      if (!moved) {
+      if (!fabMoved) {
         togglePanel();
       }
     });
@@ -164,49 +167,71 @@
     var header = panel.querySelector('.ai-jh-header');
     header.addEventListener('mousedown', function(e) {
       if (e.target.closest('.ai-jh-header-btn')) return;
-      dragging = true;
-      moved = false;
-      startX = e.clientX;
-      startY = e.clientY;
+      headerDragging = true;
+      headerMoved = false;
+      headerStartX = e.clientX;
+      headerStartY = e.clientY;
       var rect = widget.getBoundingClientRect();
-      startLeft = rect.left;
-      startBottom = window.innerHeight - rect.bottom;
+      headerStartLeft = rect.left;
+      headerStartBottom = window.innerHeight - rect.bottom;
       header.classList.add('dragging');
       e.preventDefault();
     });
 
     // 浮动按钮拖拽
     fab.addEventListener('mousedown', function(e) {
-      dragging = true;
-      moved = false;
-      startX = e.clientX;
-      startY = e.clientY;
+      fabDragging = true;
+      fabMoved = false;
+      fabStartX = e.clientX;
+      fabStartY = e.clientY;
       var rect = widget.getBoundingClientRect();
-      startLeft = rect.left;
-      startBottom = window.innerHeight - rect.bottom;
+      fabStartLeft = rect.left;
+      fabStartBottom = window.innerHeight - rect.bottom;
       fab.classList.add('dragging');
       e.preventDefault();
     });
 
     document.addEventListener('mousemove', function(e) {
-      if (!dragging) return;
-      if (Math.abs(e.clientX - startX) > 3 || Math.abs(e.clientY - startY) > 3) {
-        moved = true;
-        var newLeft = startLeft + e.clientX - startX;
-        var newBottom = startBottom - (e.clientY - startY);
-        widget.style.right = 'auto';
-        widget.style.left = newLeft + 'px';
-        widget.style.bottom = newBottom + 'px';
+      // 处理浮动按钮拖拽
+      if (fabDragging) {
+        if (Math.abs(e.clientX - fabStartX) > 3 || Math.abs(e.clientY - fabStartY) > 3) {
+          fabMoved = true;
+          var newLeft = fabStartLeft + e.clientX - fabStartX;
+          var newBottom = fabStartBottom - (e.clientY - fabStartY);
+          widget.style.right = 'auto';
+          widget.style.left = newLeft + 'px';
+          widget.style.bottom = newBottom + 'px';
+        }
+      }
+      // 处理标题栏拖拽
+      if (headerDragging) {
+        if (Math.abs(e.clientX - headerStartX) > 3 || Math.abs(e.clientY - headerStartY) > 3) {
+          headerMoved = true;
+          var newLeft = headerStartLeft + e.clientX - headerStartX;
+          var newBottom = headerStartBottom - (e.clientY - headerStartY);
+          widget.style.right = 'auto';
+          widget.style.left = newLeft + 'px';
+          widget.style.bottom = newBottom + 'px';
+        }
       }
     });
 
     document.addEventListener('mouseup', function() {
-      if (!dragging) return;
-      dragging = false;
-      header.classList.remove('dragging');
-      fab.classList.remove('dragging');
-      if (moved) {
-        savePosition();
+      // 处理浮动按钮拖拽结束
+      if (fabDragging) {
+        fabDragging = false;
+        fab.classList.remove('dragging');
+        if (fabMoved) {
+          savePosition();
+        }
+      }
+      // 处理标题栏拖拽结束
+      if (headerDragging) {
+        headerDragging = false;
+        header.classList.remove('dragging');
+        if (headerMoved) {
+          savePosition();
+        }
       }
     });
 
@@ -270,40 +295,36 @@
     btn.classList.add('loading');
     btn.querySelector('.ai-jh-btn-icon').innerHTML = icons.loading;
 
-    // 并行提取 JD 和职位信息
-    Promise.all([
-      chrome.scripting.executeScript({ target: { tabId: undefined }, func: extractJDFromPage }),
-      chrome.scripting.executeScript({ target: { tabId: undefined }, func: extractJobInfo })
-    ]).then(function(results) {
-      // 获取当前 tab ID
-      chrome.tabs.query({ active: true, currentWindow: true }, function(tabs) {
-        if (!tabs[0]) {
-          showToast('无法获取当前页面', 'error');
-          resetExtractBtn();
-          return;
+    // 获取当前 tab ID
+    chrome.tabs.query({ active: true, currentWindow: true }, function(tabs) {
+      if (!tabs[0]) {
+        showToast('无法获取当前页面', 'error');
+        resetExtractBtn();
+        return;
+      }
+
+      var tabId = tabs[0].id;
+
+      // 并行提取 JD 和职位信息
+      Promise.all([
+        chrome.scripting.executeScript({ target: { tabId: tabId }, func: extractJDFromPage }),
+        chrome.scripting.executeScript({ target: { tabId: tabId }, func: extractJobInfo })
+      ]).then(function(results) {
+        var jdText = results[0]?.[0]?.result || '';
+        var jobInfo = results[1]?.[0]?.result || {};
+
+        if (jdText) {
+          currentJD = jdText;
+          currentJobInfo = jobInfo;
+          showPreview(jdText, jobInfo);
+          showToast('JD 提取成功', 'success');
+        } else {
+          showToast('未提取到 JD，请手动粘贴', 'error');
         }
-
-        var tabId = tabs[0].id;
-        Promise.all([
-          chrome.scripting.executeScript({ target: { tabId: tabId }, func: extractJDFromPage }),
-          chrome.scripting.executeScript({ target: { tabId: tabId }, func: extractJobInfo })
-        ]).then(function(results) {
-          var jdText = results[0]?.[0]?.result || '';
-          var jobInfo = results[1]?.[0]?.result || {};
-
-          if (jdText) {
-            currentJD = jdText;
-            currentJobInfo = jobInfo;
-            showPreview(jdText, jobInfo);
-            showToast('JD 提取成功', 'success');
-          } else {
-            showToast('未提取到 JD，请手动粘贴', 'error');
-          }
-          resetExtractBtn();
-        }).catch(function(err) {
-          showToast('提取失败: ' + err.message, 'error');
-          resetExtractBtn();
-        });
+        resetExtractBtn();
+      }).catch(function(err) {
+        showToast('提取失败: ' + err.message, 'error');
+        resetExtractBtn();
       });
     });
   }
