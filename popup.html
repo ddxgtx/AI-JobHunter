@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI 简历助手</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #f2f2f7;
+      --surface: #ffffff;
+      --text-primary: #1c1c1e;
+      --text-secondary: #8e8e93;
+      --text-tertiary: #aeaeb2;
+      --separator: rgba(60, 60, 67, 0.08);
+      --accent: #007aff;
+      --accent-soft: rgba(0, 122, 255, 0.08);
+      --green: #34c759;
+      --green-soft: rgba(52, 199, 89, 0.1);
+      --red: #ff3b30;
+      --red-soft: rgba(255, 59, 48, 0.08);
+      --fill: #e5e5ea;
+      --grouped-bg: #f2f2f7;
+      --radius-sm: 8px;
+      --radius-md: 12px;
+      --radius-lg: 16px;
+    }
+
+    body {
+      width: 380px;
+      min-height: 520px;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+      background: var(--grouped-bg);
+      color: var(--text-primary);
+      font-size: 13px;
+      line-height: 1.47;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Header */
+    .nav-bar {
+      background: var(--surface);
+      padding: 14px 20px 0;
+      border-bottom: 0.5px solid var(--separator);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    .nav-title {
+      font-size: 17px;
+      font-weight: 600;
+      letter-spacing: -0.2px;
+      color: var(--text-primary);
+      margin-bottom: 12px;
+    }
+
+    /* Segmented Control (iOS style) */
+    .segmented-control {
+      display: flex;
+      background: var(--fill);
+      border-radius: 8px;
+      padding: 2px;
+      gap: 0;
+    }
+    .seg-item {
+      flex: 1;
+      padding: 6px 0;
+      text-align: center;
+      font-size: 12.5px;
+      font-weight: 500;
+      cursor: pointer;
+      border-radius: 6.5px;
+      color: var(--text-secondary);
+      transition: all 0.2s ease;
+      user-select: none;
+    }
+    .seg-item.active {
+      background: var(--surface);
+      color: var(--text-primary);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
+    }
+
+    /* Tab panels */
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    /* Grouped list (iOS Settings style) */
+    .group {
+      margin: 16px 16px 0;
+      background: var(--surface);
+      border-radius: var(--radius-md);
+      overflow: hidden;
+    }
+    .group-header {
+      font-size: 12px;
+      font-weight: 400;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.2px;
+      padding: 8px 16px 4px;
+    }
+
+    /* Input cells */
+    .cell {
+      padding: 10px 16px;
+      border-bottom: 0.5px solid var(--separator);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .cell:last-child { border-bottom: none; }
+    .cell-label {
+      font-size: 13px;
+      color: var(--text-primary);
+      min-width: 60px;
+      flex-shrink: 0;
+    }
+    .cell-input {
+      flex: 1;
+      border: none;
+      outline: none;
+      font-size: 13px;
+      font-family: inherit;
+      background: transparent;
+      color: var(--text-primary);
+      text-align: right;
+    }
+    .cell-input::placeholder { color: var(--text-tertiary); }
+    .cell-input-full {
+      width: 100%;
+      border: none;
+      outline: none;
+      font-size: 13px;
+      font-family: inherit;
+      background: transparent;
+      color: var(--text-primary);
+    }
+    .cell-input-full::placeholder { color: var(--text-tertiary); }
+    .cell-select {
+      flex: 1;
+      border: none;
+      outline: none;
+      font-size: 13px;
+      font-family: inherit;
+      background: transparent;
+      color: var(--text-primary);
+      text-align: right;
+      -webkit-appearance: none;
+      appearance: none;
+      cursor: pointer;
+    }
+
+    /* Textarea cell */
+    .cell-textarea {
+      padding: 10px 16px;
+      border-bottom: 0.5px solid var(--separator);
+    }
+    .cell-textarea:last-child { border-bottom: none; }
+    .cell-textarea textarea {
+      width: 100%;
+      border: none;
+      outline: none;
+      font-size: 13px;
+      font-family: inherit;
+      background: transparent;
+      color: var(--text-primary);
+      resize: vertical;
+      line-height: 1.5;
+    }
+    .cell-textarea textarea::placeholder { color: var(--text-tertiary); }
+
+    /* Buttons */
+    .btn-row {
+      margin: 16px 16px 0;
+    }
+    .btn {
+      width: 100%;
+      padding: 12px;
+      border: none;
+      border-radius: var(--radius-md);
+      font-size: 15px;
+      font-weight: 500;
+      font-family: inherit;
+      cursor: pointer;
+      transition: opacity 0.15s;
+      letter-spacing: -0.1px;
+    }
+    .btn:active { opacity: 0.7; }
+    .btn-accent {
+      background: var(--accent);
+      color: white;
+    }
+    .btn-accent:disabled { background: var(--fill); color: var(--text-tertiary); cursor: not-allowed; }
+    .btn-secondary {
+      background: var(--fill);
+      color: var(--accent);
+      margin-top: 8px;
+      font-size: 13px;
+    }
+    .btn-green {
+      background: var(--green);
+      color: white;
+      margin-top: 8px;
+    }
+    .btn-link {
+      background: none;
+      color: var(--accent);
+      font-size: 13px;
+      font-weight: 400;
+      padding: 8px;
+      width: auto;
+    }
+
+    /* Result area */
+    .result-area {
+      margin: 16px;
+      background: var(--surface);
+      border-radius: var(--radius-md);
+      padding: 14px 16px;
+    }
+    .result-area .label {
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-bottom: 8px;
+    }
+    .result-text {
+      font-size: 13px;
+      line-height: 1.6;
+      color: var(--text-primary);
+      white-space: pre-wrap;
+      min-height: 48px;
+    }
+    .result-text.streaming::after {
+      content: '\25CB';
+      animation: blink 1s infinite;
+      color: var(--accent);
+      font-size: 14px;
+    }
+    @keyframes blink {
+      0%, 50% { opacity: 1; }
+      51%, 100% { opacity: 0; }
+    }
+
+    /* Inline action bar */
+    .action-bar {
+      display: flex;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .action-bar .btn {
+      width: auto;
+      flex: 1;
+      font-size: 13px;
+      padding: 8px 12px;
+    }
+
+    /* Tone pills */
+    .tone-pills {
+      display: flex;
+      gap: 8px;
+      margin-top: 4px;
+    }
+    .tone-pill {
+      flex: 1;
+      padding: 7px 0;
+      text-align: center;
+      font-size: 12.5px;
+      font-weight: 500;
+      cursor: pointer;
+      border-radius: 20px;
+      border: 1px solid var(--separator);
+      color: var(--text-secondary);
+      background: transparent;
+      transition: all 0.15s;
+      user-select: none;
+    }
+    .tone-pill.active {
+      border-color: var(--accent);
+      color: var(--accent);
+      background: var(--accent-soft);
+    }
+
+    /* Status toast */
+    .toast {
+      margin: 0 16px;
+      padding: 8px 12px;
+      border-radius: var(--radius-sm);
+      font-size: 12px;
+      font-weight: 500;
+      display: none;
+      margin-top: 10px;
+    }
+    .toast.ok { background: var(--green-soft); color: #1b7a35; }
+    .toast.err { background: var(--red-soft); color: #c41e00; }
+    .toast.info { background: var(--accent-soft); color: var(--accent); }
+
+    /* Fill log */
+    .fill-log {
+      margin: 12px 16px 0;
+      background: var(--surface);
+      border-radius: var(--radius-md);
+      padding: 12px 16px;
+      font-size: 12px;
+      color: var(--text-secondary);
+      display: none;
+      max-height: 180px;
+      overflow-y: auto;
+    }
+    .fill-log .ln { padding: 3px 0; }
+    .fill-log .ln.ok { color: #1b7a35; }
+    .fill-log .ln.fail { color: #c41e00; }
+
+    /* History */
+    .history-item {
+      padding: 12px 16px;
+      border-bottom: 0.5px solid var(--separator);
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .history-item:last-child { border-bottom: none; }
+    .history-item:active { background: var(--grouped-bg); }
+    .history-meta {
+      font-size: 11px;
+      color: var(--text-tertiary);
+      margin-bottom: 4px;
+    }
+    .history-text {
+      font-size: 13px;
+      color: var(--text-primary);
+      line-height: 1.5;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .history-empty {
+      padding: 32px 16px;
+      text-align: center;
+      font-size: 13px;
+      color: var(--text-tertiary);
+    }
+
+    /* Toggle arrow */
+    .cell-arrow {
+      color: var(--text-tertiary);
+      font-size: 14px;
+      margin-left: auto;
+      transition: transform 0.2s ease;
+      display: inline-block;
+    }
+    .cell-arrow.open {
+      transform: rotate(90deg);
+    }
+
+    /* Spinner */
+    .spin {
+      display: inline-block;
+      width: 14px;
+      height: 14px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: sp 0.7s linear infinite;
+      vertical-align: middle;
+      margin-right: 6px;
+    }
+    @keyframes sp { to { transform: rotate(360deg); } }
+
+    /* Settings separator */
+    .settings-separator {
+      margin: 16px 16px 0;
+      border: none;
+      border-top: 0.5px solid var(--separator);
+    }
+
+
+    /* Footer */
+    .footer {
+      text-align: center;
+      padding: 12px;
+      font-size: 11px;
+      color: var(--text-tertiary);
+    }
+
+    /* MD Editor */
+    .md-editor {
+      margin: 16px;
+      background: var(--surface);
+      border-radius: var(--radius-md);
+      padding: 14px 16px;
+    }
+    .md-editor textarea {
+      width: 100%;
+      min-height: 300px;
+      border: none;
+      outline: none;
+      font-size: 13px;
+      font-family: 'SF Mono', 'Menlo', 'Monaco', 'Consolas', monospace;
+      background: transparent;
+      color: var(--text-primary);
+      resize: vertical;
+      line-height: 1.6;
+    }
+    .md-editor textarea::placeholder { color: var(--text-tertiary); }
+  </style>
+</head>
+  <body>
+  
+    <div class="nav-bar">
+      <div class="nav-title">AI 简历助手</div>
+      <div class="segmented-control">
+        <div class="seg-item active" data-tab="greeting">生成话术</div>
+        <div class="seg-item" data-tab="resume">简历填写</div>
+        <div class="seg-item" data-tab="md">简历文档</div>
+        <div class="seg-item" data-tab="history">历史</div>
+      </div>
+    </div>
+
+  <!-- ====== 生成话术 ====== -->
+  <div class="tab-panel active" id="panel-greeting">
+
+    <div class="group">
+      <div class="cell-textarea">
+        <textarea id="jdInput" rows="4" placeholder="粘贴职位描述，或从当前页面获取..."></textarea>
+      </div>
+    </div>
+    <div class="btn-row" style="margin-top:8px;">
+      <button class="btn btn-secondary" id="fetchJd">从当前页面获取 JD</button>
+      <button class="btn btn-secondary" id="pasteJd" style="margin-top:6px;">📋 从剪贴板粘贴 JD</button>
+    </div>
+
+    <div class="group">
+      <div class="cell">
+        <span class="cell-label">风格</span>
+        <div class="tone-pills" style="flex:1;">
+          <div class="tone-pill active" data-tone="professional">专业</div>
+          <div class="tone-pill" data-tone="friendly">亲和</div>
+          <div class="tone-pill" data-tone="confident">自信</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-accent" id="generateBtn">生成打招呼话术</button>
+      <div id="greetStatus" class="toast" style="display:none;"></div>
+    </div>
+
+    <div class="result-area" id="resultArea" style="display:none;">
+      <div class="label">生成结果</div>
+      <div class="result-text" id="result"></div>
+      <div class="action-bar">
+        <button class="btn btn-secondary" id="copyBtn">复制话术</button>
+        <button class="btn btn-secondary" id="regenerateBtn">重新生成</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====== 简历填写 ====== -->
+  <div class="tab-panel" id="panel-resume">
+    <div class="group">
+      <div class="cell">
+        <span class="cell-label">姓名</span>
+        <input type="text" class="cell-input" id="r_name" placeholder="张三">
+      </div>
+      <div class="cell">
+        <span class="cell-label">手机</span>
+        <input type="text" class="cell-input" id="r_phone" placeholder="13800138000">
+      </div>
+      <div class="cell">
+        <span class="cell-label">邮箱</span>
+        <input type="text" class="cell-input" id="r_email" placeholder="name@example.com">
+      </div>
+      <div class="cell">
+        <span class="cell-label">公司</span>
+        <input type="text" class="cell-input" id="r_company" placeholder="当前公司">
+      </div>
+      <div class="cell">
+        <span class="cell-label">职位</span>
+        <input type="text" class="cell-input" id="r_title" placeholder="高级前端工程师">
+      </div>
+      <div class="cell">
+        <span class="cell-label">行业</span>
+        <input type="text" class="cell-input" id="r_industry" placeholder="互联网/IT">
+      </div>
+      <div class="cell">
+        <span class="cell-label">经验</span>
+        <select class="cell-select" id="r_exp">
+          <option value="">选择</option>
+          <option value="应届生">应届生</option>
+          <option value="1年">1年</option>
+          <option value="1-3年">1-3年</option>
+          <option value="3-5年">3-5年</option>
+          <option value="5-10年">5-10年</option>
+          <option value="10年以上">10年以上</option>
+        </select>
+      </div>
+      <div class="cell">
+        <span class="cell-label">学历</span>
+        <select class="cell-select" id="r_edu">
+          <option value="">选择</option>
+          <option value="大专">大专</option>
+          <option value="本科">本科</option>
+          <option value="硕士">硕士</option>
+          <option value="博士">博士</option>
+        </select>
+      </div>
+      <div class="cell">
+        <span class="cell-label">薪资</span>
+        <input type="text" class="cell-input" id="r_salary" placeholder="25-40K">
+      </div>
+      <div class="cell">
+        <span class="cell-label">城市</span>
+        <input type="text" class="cell-input" id="r_city" placeholder="北京">
+      </div>
+      <div class="cell">
+        <span class="cell-label">院校</span>
+        <input type="text" class="cell-input" id="r_school" placeholder="北京大学">
+      </div>
+      <div class="cell">
+        <span class="cell-label">专业</span>
+        <input type="text" class="cell-input" id="r_major" placeholder="计算机科学与技术">
+      </div>
+    </div>
+
+    <div class="group">
+      <div class="group-header">个人优势</div>
+      <div class="cell-textarea">
+        <textarea id="r_summary" rows="3" placeholder="8年前端经验，精通 React/Vue..."></textarea>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-accent" id="saveResume">保存简历信息</button>
+      <div style="display:flex;gap:8px;margin-top:8px;">
+        <button class="btn btn-secondary" id="exportResume" style="flex:1;font-size:12px;">导出简历</button>
+        <button class="btn btn-secondary" id="importResume" style="flex:1;font-size:12px;">导入简历</button>
+        <button class="btn btn-secondary" id="importPdf" style="flex:1;font-size:12px;">📄 导入 PDF</button>
+        <input type="file" id="importFile" accept=".json" style="display:none;">
+        <input type="file" id="pdfFile" accept=".pdf" style="display:none;">
+      </div>
+      <div id="resumeSaveStatus" class="toast" style="display:none;"></div>
+    </div>
+
+    <div class="btn-row" style="margin-top: 8px;">
+      <button class="btn btn-green" id="autoFillBtn">AI 智能填写当前页面</button>
+      <div id="fillStatus" class="toast" style="display:none;"></div>
+    </div>
+    <div class="fill-log" id="fillStatusBar"></div>
+  </div>
+
+  <!-- ====== 历史 ====== -->
+  <div class="tab-panel" id="panel-history">
+    <div class="group">
+      <div class="history-list" id="historyList">
+        <div class="history-empty">暂无记录</div>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-secondary" id="clearHistory">清空历史</button>
+    </div>
+  </div>
+
+  <!-- ====== 简历文档 ====== -->
+  <div class="tab-panel" id="panel-md">
+    <div class="md-editor">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <span style="font-size:12px;color:var(--text-secondary);">简历 Markdown 文档</span>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-secondary" id="generateMd" style="width:auto;padding:6px 12px;font-size:12px;">生成 MD</button>
+          <button class="btn btn-secondary" id="saveMd" style="width:auto;padding:6px 12px;font-size:12px;">保存</button>
+          <button class="btn btn-secondary" id="copyMd" style="width:auto;padding:6px 12px;font-size:12px;">复制</button>
+        </div>
+      </div>
+      <textarea id="mdEditor" placeholder="点击「生成 MD」自动生成简历文档，或直接编辑..."></textarea>
+      <div id="mdStatus" class="toast" style="display:none;"></div>
+    </div>
+  </div>
+
+  <!-- ====== 设置 ====== -->
+  <hr class="settings-separator">
+  <div class="group" style="margin-top:8px; margin-bottom: 0;">
+    <div class="cell" id="settingsToggle" style="cursor:pointer;">
+      <span class="cell-label" style="min-width:auto;">API 配置</span>
+      <span class="cell-arrow" id="settingsArrow">›</span>
+    </div>
+  </div>
+  <div id="settingsPanel" style="display:none;">
+    <div class="group">
+      <div class="cell">
+        <span class="cell-label">模型</span>
+        <select class="cell-select" id="modelSelect">
+          <option value="openai">OpenAI</option>
+          <option value="deepseek">DeepSeek</option>
+          <option value="custom">自定义</option>
+        </select>
+      </div>
+      <div class="cell" id="customModelRow" style="display:none;">
+        <span class="cell-label">模型名</span>
+        <input type="text" class="cell-input" id="customModel" placeholder="gpt-4o-mini">
+      </div>
+      <div class="cell">
+        <span class="cell-label">Key</span>
+        <input type="password" class="cell-input" id="apiKey" placeholder="sk-...">
+      </div>
+      <div class="cell" id="customApiUrlRow" style="display:none;">
+        <span class="cell-label">URL</span>
+        <input type="text" class="cell-input" id="apiUrl" placeholder="https://...">
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-accent" id="saveApiBtn">保存</button>
+      <div class="action-bar">
+        <button class="btn btn-secondary" id="testApiBtn">测试连接</button>
+      </div>
+      <div id="apiStatus" class="toast" style="display:none;"></div>
+    </div>
+  </div>
+
+  <div class="footer"><span id="modelStatus"></span> AI 简历助手 v2.5 · <a href="#" id="openSidePanel" style="color:var(--accent);text-decoration:none;">侧边栏模式</a></div>
+
+  <script src="libs/pdf.min.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>
