@@ -1,2 +1,456 @@
-/* AI 简历助手 v2.3 - Content Script Styles */
-/* Panel styles are embedded in content.js to avoid host page CSS conflicts */
+/* AI-JobHunter v2.7 - Content Script Styles */
+/* 浮动窗口样式 */
+
+/* ====== 浮动窗口容器 ====== */
+.ai-jh-widget {
+  position: fixed;
+  right: 20px;
+  bottom: 80px;
+  z-index: 2147483647;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  font-size: 13px;
+  line-height: 1.47;
+  color: #1c1c1e;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+
+/* ====== 浮动按钮（收起状态） ====== */
+.ai-jh-fab {
+  width: 48px;
+  height: 48px;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  transition: box-shadow 0.2s, transform 0.15s;
+}
+
+.ai-jh-fab:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  transform: scale(1.05);
+}
+
+.ai-jh-fab:active {
+  transform: scale(0.95);
+}
+
+.ai-jh-fab.dragging {
+  cursor: grabbing;
+  transition: none;
+}
+
+.ai-jh-fab svg {
+  width: 24px;
+  height: 24px;
+}
+
+/* ====== 浮动窗口（展开状态） ====== */
+.ai-jh-panel {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 300px;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+  transform-origin: right bottom;
+  animation: ai-jh-expand 0.2s ease-out;
+}
+
+@keyframes ai-jh-expand {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* ====== 标题栏 ====== */
+.ai-jh-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: linear-gradient(135deg, #007AFF, #5856D6);
+  color: #fff;
+  cursor: grab;
+}
+
+.ai-jh-header.dragging {
+  cursor: grabbing;
+}
+
+.ai-jh-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ai-jh-header-left svg {
+  width: 20px;
+  height: 20px;
+}
+
+.ai-jh-header-title {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.ai-jh-header-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.ai-jh-header-btn {
+  width: 24px;
+  height: 24px;
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  border-radius: 6px;
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+}
+
+.ai-jh-header-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.ai-jh-header-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* ====== 内容区 ====== */
+.ai-jh-content {
+  padding: 12px;
+}
+
+/* ====== 按钮组 ====== */
+.ai-jh-btn-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ai-jh-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: #f2f2f7;
+  border: none;
+  border-radius: 10px;
+  color: #1c1c1e;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+  text-align: left;
+  width: 100%;
+}
+
+.ai-jh-btn:hover {
+  background: #e5e5ea;
+}
+
+.ai-jh-btn:active {
+  transform: scale(0.98);
+  background: #d1d1d6;
+}
+
+.ai-jh-btn.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.ai-jh-btn.disabled:hover {
+  background: #f2f2f7;
+}
+
+.ai-jh-btn-icon {
+  width: 32px;
+  height: 32px;
+  background: #fff;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.ai-jh-btn-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.ai-jh-btn-text {
+  flex: 1;
+}
+
+.ai-jh-btn-title {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.ai-jh-btn-desc {
+  font-size: 11px;
+  color: #8e8e93;
+  margin-top: 2px;
+}
+
+/* ====== 加载状态 ====== */
+.ai-jh-btn.loading .ai-jh-btn-icon {
+  animation: ai-jh-spin 1s linear infinite;
+}
+
+@keyframes ai-jh-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* ====== 分隔线 ====== */
+.ai-jh-divider {
+  height: 1px;
+  background: rgba(60, 60, 67, 0.08);
+  margin: 12px 0;
+}
+
+/* ====== JD 预览区 ====== */
+.ai-jh-preview {
+  background: #f9f9fb;
+  border-radius: 10px;
+  padding: 12px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.ai-jh-preview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.ai-jh-preview-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #8e8e93;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.ai-jh-preview-close {
+  width: 20px;
+  height: 20px;
+  background: none;
+  border: none;
+  color: #8e8e93;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: background 0.15s;
+}
+
+.ai-jh-preview-close:hover {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.ai-jh-preview-close svg {
+  width: 12px;
+  height: 12px;
+}
+
+/* ====== 职位信息卡片 ====== */
+.ai-jh-job-card {
+  margin-bottom: 12px;
+}
+
+.ai-jh-job-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1c1c1e;
+  margin-bottom: 4px;
+}
+
+.ai-jh-job-company {
+  font-size: 13px;
+  color: #007AFF;
+  margin-bottom: 8px;
+}
+
+.ai-jh-job-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.ai-jh-job-tag {
+  padding: 3px 8px;
+  background: rgba(0, 122, 255, 0.08);
+  border-radius: 6px;
+  font-size: 11px;
+  color: #007AFF;
+}
+
+/* ====== JD 内容 ====== */
+.ai-jh-jd-content {
+  font-size: 12px;
+  line-height: 1.6;
+  color: #3c3c3e;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.ai-jh-jd-content.collapsed {
+  max-height: 100px;
+  overflow: hidden;
+  position: relative;
+}
+
+.ai-jh-jd-content.collapsed::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 40px;
+  background: linear-gradient(transparent, #f9f9fb);
+}
+
+.ai-jh-jd-toggle {
+  display: inline-block;
+  margin-top: 8px;
+  font-size: 12px;
+  color: #007AFF;
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0;
+}
+
+.ai-jh-jd-toggle:hover {
+  text-decoration: underline;
+}
+
+/* ====== 填写进度 ====== */
+.ai-jh-fill-progress {
+  margin-top: 12px;
+}
+
+.ai-jh-fill-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #f2f2f7;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  font-size: 12px;
+}
+
+.ai-jh-fill-status.success {
+  background: rgba(52, 199, 89, 0.1);
+  color: #1b7a35;
+}
+
+.ai-jh-fill-status.error {
+  background: rgba(255, 59, 48, 0.08);
+  color: #c41e00;
+}
+
+.ai-jh-fill-status-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+/* ====== 底部信息 ====== */
+.ai-jh-footer {
+  padding: 8px 12px;
+  background: #f9f9fb;
+  border-top: 1px solid rgba(60, 60, 67, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.ai-jh-footer-text {
+  font-size: 11px;
+  color: #8e8e93;
+}
+
+.ai-jh-footer-link {
+  color: #007AFF;
+  text-decoration: none;
+}
+
+.ai-jh-footer-link:hover {
+  text-decoration: underline;
+}
+
+/* ====== 通知 Toast ====== */
+.ai-jh-toast {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  padding: 12px 16px;
+  background: #1c1c1e;
+  color: #fff;
+  border-radius: 10px;
+  font-size: 13px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  z-index: 2147483647;
+  animation: ai-jh-toast-in 0.3s ease-out;
+}
+
+@keyframes ai-jh-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.ai-jh-toast.success {
+  background: #34c759;
+}
+
+.ai-jh-toast.error {
+  background: #ff3b30;
+}
+
+/* ====== 滚动条 ====== */
+.ai-jh-preview::-webkit-scrollbar {
+  width: 4px;
+}
+
+.ai-jh-preview::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.ai-jh-preview::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 2px;
+}
+
+.ai-jh-preview::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.25);
+}
