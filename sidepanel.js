@@ -528,7 +528,9 @@ document.addEventListener('DOMContentLoaded', () => {
       let text = '';
       if (result.matchedSkills?.length) text += '✅ 匹配技能: ' + result.matchedSkills.join('、') + '\n';
       if (result.missingSkills?.length) text += '❌ 缺少技能: ' + result.missingSkills.join('、') + '\n';
-      if (result.suggestions) text += '\n💡 ' + result.suggestions;
+      if (result.strengths?.length) text += '💪 优势亮点: ' + result.strengths.join('、') + '\n';
+      if (result.weaknesses?.length) text += '⚠️ 不足之处: ' + result.weaknesses.join('、') + '\n';
+      if (result.suggestions) text += '\n💡 优化建议: ' + result.suggestions;
       sugEl.textContent = text.trim();
     }
   }
@@ -1004,6 +1006,9 @@ document.addEventListener('DOMContentLoaded', () => {
     else if (url.includes('lagou.com')) platform = 'lagou';
     else if (url.includes('kanzhun.com')) platform = 'kanzhun';
     else if (url.includes('58.com')) platform = '58';
+    else if (url.includes('linkedin.com')) platform = 'linkedin';
+    else if (url.includes('maimai.cn')) platform = 'maimai';
+    else if (url.includes('offercool.com')) platform = 'offercool';
 
     // 2. Platform-specific selectors (specific first)
     const selectors = {
@@ -1013,7 +1018,10 @@ document.addEventListener('DOMContentLoaded', () => {
       liepin: ['.job-intro-container', '.job-qualifications', '.job-intro'],
       lagou: ['.job_bt', '.job-detail-content', '.job_detail'],
       kanzhun: ['.job-detail .job-sec-text', '.detail-content .job-sec-text'],
-      '58': ['.job-detail .job_desc', '.des', '.job-description']
+      '58': ['.job-detail .job_desc', '.des', '.job-description'],
+      linkedin: ['.jobs-description__content', '.jobs-box__html-content', '.job-details'],
+      maimai: ['.job-detail-description', '.job-desc'],
+      offercool: ['.job-detail-content', '.job-desc']
     };
 
     // Aggressive remove list for cloned elements
@@ -1032,23 +1040,67 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
-    // Phase B: keyword-based detection
+    // Phase B: keyword-based detection with improved scoring
     if (!jdText || jdText.length < 50) {
-      const jdKeywords = ['岗位职责', '任职要求', '职位描述', '岗位要求', '职位要求', '工作职责', '任职资格', '工作内容', '我们希望', '你需要', '你需要具备', '加分项'];
+      // Core JD keywords with weights
+      const coreKeywords = {
+        '岗位职责': 150, '任职要求': 150, '职位描述': 150, '岗位要求': 150,
+        '工作职责': 140, '任职资格': 140, '工作内容': 140, '职位要求': 140,
+        '我们需要': 120, '我们希望': 120, '你需要': 120, '你能': 110,
+        '加分项': 100, '优先': 90, '具备': 80, '负责': 80
+      };
+      // Secondary keywords (lower weight)
+      const secondaryKeywords = ['技能', '经验', '学历', '专业', '语言', '熟悉', '了解', '掌握', '开发', '设计', '管理', '分析', '沟通', '团队'];
+
       let bestEl = null, bestScore = 0;
-      for (const el of document.querySelectorAll('div, section, article')) {
+      const candidates = document.querySelectorAll('div, section, article, li, p');
+
+      for (const el of candidates) {
         const text = el.textContent || '';
         if (text.length < 30 || text.length > 5000) continue;
+
+        // Skip if too many nested divs (likely container)
+        const divCount = el.querySelectorAll('div').length;
+        if (divCount > 10) continue;
+
         let score = 0;
-        for (const kw of jdKeywords) { if (text.includes(kw)) score += 100; }
+
+        // Score based on core keywords (high weight)
+        for (const [kw, weight] of Object.entries(coreKeywords)) {
+          if (text.includes(kw)) score += weight;
+        }
+
+        // Score based on secondary keywords (lower weight)
+        for (const kw of secondaryKeywords) {
+          if (text.includes(kw)) score += 20;
+        }
+
+        // Chinese character ratio (prefer Chinese content)
         const chinese = (text.match(/[\u4e00-\u9fff]/g) || []).length;
-        if (chinese / text.length < 0.3) continue;
-        score += chinese;
-        if (text.length > 2000) score -= 100;
-        score -= el.querySelectorAll('div').length * 5;
+        const chineseRatio = chinese / text.length;
+        if (chineseRatio < 0.3) continue;
+        score += chinese * 0.5;
+
+        // Prefer moderate length (not too short, not too long)
+        if (text.length >= 100 && text.length <= 2000) score += 50;
+        else if (text.length > 2000 && text.length <= 3000) score += 20;
+        else if (text.length > 3000) score -= 50;
+
+        // Penalty for too many divs (likely navigation/container)
+        score -= divCount * 3;
+
+        // Bonus for containing list items (typical in JD)
+        const listItems = el.querySelectorAll('li').length;
+        if (listItems >= 3 && listItems <= 15) score += 30;
+
+        // Bonus for containing numbers (requirements often have numbers)
+        const numbers = text.match(/\d+[\s]*[年月天Kk]/g);
+        if (numbers && numbers.length >= 1 && numbers.length <= 5) score += 20;
+
         if (score > bestScore) { bestScore = score; bestEl = el; }
       }
-      if (bestEl && bestScore > 200) {
+
+      if (bestEl && bestScore > 150) {
         const clone = bestEl.cloneNode(true);
         clone.querySelectorAll(removeTags).forEach(r => r.remove());
         jdText = clone.textContent.trim();

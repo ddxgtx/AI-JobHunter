@@ -124,7 +124,10 @@ async function callAPI(config, prompt, retries) {
     let timeoutId;
     try {
       const controller = new AbortController();
-      timeoutId = setTimeout(() => controller.abort(), 30000);
+      // 超时时间：首次 20 秒，重试时递增
+      const timeout = 20000 + (attempt * 5000);
+      timeoutId = setTimeout(() => controller.abort(), timeout);
+      
       const resp = await fetch(apiUrl, {
         method: 'POST',
         headers: {
@@ -144,9 +147,10 @@ async function callAPI(config, prompt, retries) {
       if (!resp.ok) {
         const err = await resp.json().catch(() => ({}));
         const errMsg = err.error?.message || 'API 请求失败 (' + resp.status + ')';
-        // 429/5xx 可重试
+        // 429/5xx 可重试（指数退避）
         if ((resp.status === 429 || resp.status >= 500) && attempt < retries) {
-          await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
+          const delay = Math.min(1000 * Math.pow(2, attempt), 5000);
+          await new Promise(r => setTimeout(r, delay));
           continue;
         }
         throw new Error(errMsg);
@@ -160,15 +164,20 @@ async function callAPI(config, prompt, retries) {
       const isAbort = e.name === 'AbortError';
       const isFetchErr = e.message && (e.message.includes('fetch') || e.message.includes('Failed') || e.message.includes('network'));
       const retriable = isAbort || isFetchErr;
+      
+      // 指数退避重试
       if (attempt < retries && retriable) {
-        await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
+        const delay = Math.min(1000 * Math.pow(2, attempt), 5000);
+        await new Promise(r => setTimeout(r, delay));
         continue;
       }
-      if (isAbort) throw new Error('请求超时（30秒），请检查网络连接');
+      
+      // 优化错误信息
+      if (isAbort) throw new Error('请求超时（' + (20 + attempt * 5) + '秒），请检查网络连接或稍后重试');
       if (isFetchErr) throw new Error('网络连接失败，请检查网络或 API 地址');
-      if (e.message.includes('401')) throw new Error('API Key 无效或已过期');
-      if (e.message.includes('403')) throw new Error('API Key 权限不足');
-      if (e.message.includes('429')) throw new Error('请求过于频繁，请稍后重试');
+      if (e.message.includes('401')) throw new Error('API Key 无效或已过期，请重新配置');
+      if (e.message.includes('403')) throw new Error('API Key 权限不足，请检查 Key 权限');
+      if (e.message.includes('429')) throw new Error('请求过于频繁，请稍后重试（建议升级 API 套餐）');
       throw e;
     }
   }
@@ -305,7 +314,13 @@ async function handleTestConnection() {
 }
 
 function buildGreetingPrompt(jd, tone, config, length) {
-  const toneMap = { professional:'专业、严谨、商务化', friendly:'亲和、友好、轻松自然', confident:'自信、直接、突出实力', concise:'简洁、精炼、重点突出、一两句话说清核心优势', enthusiastic:'热情、积极、充满诚意、表达对岗位的强烈兴趣' };
+  const toneMap = {
+    professional: '专业、严谨、商务化，展现职业素养',
+    friendly: '亲和、友好、轻松自然，拉近距离',
+    confident: '自信、直接、突出实力，展现核心竞争力',
+    concise: '简洁、精炼、重点突出、一两句话说清核心匹配点',
+    enthusiastic: '热情、积极、充满诚意、表达对岗位的强烈兴趣'
+  };
   const r = config.resume || {};
   const toneLabel = toneMap[tone] || toneMap.professional;
 
@@ -323,28 +338,40 @@ function buildGreetingPrompt(jd, tone, config, length) {
   if (r.r_city)     resumeLines.push('期望城市：' + r.r_city);
   if (r.r_summary)  resumeLines.push('个人优势：' + r.r_summary);
 
-  return `你是一位资深求职顾问。根据以下职位描述（JD）和求职者简历信息，生成一段适合在招聘平台上发送给 HR 的打招呼话术。
+  const lengthMap = {
+    short: '简短版30-60字，一句话说清核心匹配点',
+    medium: '适中版60-120字，简洁有力，直击要点',
+    long: '详细版120-200字，内容丰富，详细展示优势和匹配度'
+  };
 
-要求：
-- 风格：${toneLabel}
-- 长度要求：
-  - short: 30-60 字，极度精炼，一句话说清核心匹配点
-  - medium: 60-120 字，简洁有力，直击要点
-  - long: 120-200 字，内容丰富，详细展示优势和匹配度
-- 当前选择: ${({short:'简短版30-60字',medium:'适中版60-120字',long:'详细版120-200字'}[length] || '适中版60-120字')}
-- 从 JD 中直接提取公司名称、岗位名称，在话术中体现
+  return `你是一位资深求职顾问，擅长撰写高回复率的招聘平台打招呼话术。
+
+任务：根据以下职位描述（JD）和求职者简历信息，生成一段适合在招聘平台上发送给 HR 的打招呼话术。
+
+【话术要求】
+1. 风格：${toneLabel}
+2. 长度：${lengthMap[length] || lengthMap.medium}
+3. 结构建议：
+   - 开头：简短问候 + 表达对岗位的兴趣（1句）
+   - 中间：突出与 JD 最匹配的 1-2 个核心优势（用数据/成果支撑）
+   - 结尾：表达进一步沟通的意愿（1句）
+
+【关键原则】
+- 从 JD 中提取公司名称、岗位名称，在话术中自然体现
 - 根据简历背景判断与 JD 的匹配度，突出最相关的经验/技能
+- 用具体数据和成果说话（如：提升 XX%、负责 XX 规模项目）
 - 如果学历或院校有优势可适当提及，否则省略
-- 语气自然，不要用"尊敬的HR"之类的开头
+- 语气自然真诚，不要用"尊敬的HR"之类的模板化开头
 - 不要逐条罗列简历，不要重复 JD 原文
+- 避免过度谦卑或过度自信
 
-求职者简历：
+【求职者简历】
 ${resumeLines.join('\n')}
 
-职位描述：
+【职位描述】
 ${jd}
 
-请直接输出打招呼话术，不要添加任何解释或前缀。`;
+请直接输出打招呼话术，不要添加任何解释、前缀或后缀。`;
 }
 
 async function handleAutoFill(pageFields, resume) {
@@ -483,34 +510,64 @@ async function handleAnalyzeMatch(jdText, resume) {
   if (resume.r_industry) resumeLines.push('行业：' + resume.r_industry);
   if (resume.r_summary) resumeLines.push('优势：' + resume.r_summary);
 
-  const prompt = `分析以下简历与职位描述的匹配度。
+  const prompt = `你是一位资深 HR 顾问，擅长分析简历与职位的匹配度。
 
-简历信息：
+任务：分析以下简历与职位描述（JD）的匹配度，给出详细的评估报告。
+
+【简历信息】
 ${resumeLines.join('\n')}
 
-职位描述：
+【职位描述】
 ${jdText.substring(0, 3000)}
 
-请返回一个 JSON 对象：
+请返回一个 JSON 对象，包含以下字段：
 {
   "score": 75,
   "matchedSkills": ["Python", "Django", "MySQL"],
   "missingSkills": ["Redis", "Docker"],
-  "suggestions": "建议补充 Redis 和 Docker 相关经验..."
+  "strengths": ["3年相关经验", "计算机专业背景"],
+  "weaknesses": ["缺少分布式系统经验"],
+  "suggestions": "建议补充 Redis 和 Docker 相关经验，可以在项目中实践..."
 }
 
-规则：
-1. score 是 0-100 的匹配度分数
-2. matchedSkills 是简历中已有的匹配技能（最多8个）
-3. missingSkills 是 JD 要求但简历中缺少的技能（最多8个）
-4. suggestions 是一段简短的优化建议（50-100字）
-5. 只输出 JSON 对象，不要其他文字`;
+【评分标准】
+- 90-100：完美匹配，技能、经验、学历都符合
+- 80-89：高度匹配，核心技能都具备，少量次要技能缺失
+- 70-79：较好匹配，具备大部分核心技能，有 1-2 项缺失
+- 60-69：基本匹配，具备部分核心技能，需要补充学习
+- 50-59：勉强匹配，技能差距较大，需要较多学习
+- 50 以下：不建议申请，差距过大
+
+【分析维度】
+1. 技能匹配（40%）：技术栈、工具、框架
+2. 经验匹配（30%）：工作年限、项目经验、行业经验
+3. 学历匹配（15%）：学历、专业、院校
+4. 其他匹配（15%）：城市、薪资期望、语言能力
+
+【输出要求】
+1. score：0-100 的匹配度分数
+2. matchedSkills：简历中已有的匹配技能（最多8个）
+3. missingSkills：JD 要求但简历中缺少的技能（最多8个）
+4. strengths：简历的优势亮点（最多3个）
+5. weaknesses：简历的不足之处（最多3个）
+6. suggestions：具体的优化建议（100-150字）
+
+只输出 JSON 对象，不要其他文字。`;
   const result = await callAPI(config, prompt, 0);
   try {
     const jsonStr = result.match(/\{[\s\S]*\}/)?.[0] || result;
-    return JSON.parse(jsonStr);
+    const parsed = JSON.parse(jsonStr);
+    // 确保返回格式完整
+    return {
+      score: parsed.score || 0,
+      matchedSkills: parsed.matchedSkills || [],
+      missingSkills: parsed.missingSkills || [],
+      strengths: parsed.strengths || [],
+      weaknesses: parsed.weaknesses || [],
+      suggestions: parsed.suggestions || '暂无建议'
+    };
   } catch (e) {
-    return { score: 0, matchedSkills: [], missingSkills: [], suggestions: '解析失败，请重试' };
+    return { score: 0, matchedSkills: [], missingSkills: [], strengths: [], weaknesses: [], suggestions: '解析失败，请重试' };
   }
 }
 
