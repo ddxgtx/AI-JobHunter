@@ -558,7 +558,6 @@ async function handleKeywordOptimize(jdText, resume) {
 
 简历信息：
 ${resumeLines.join('\n')}
-')}
 
 职位描述：
 ${jdText.substring(0, 3000)}

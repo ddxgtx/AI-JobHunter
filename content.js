@@ -1,5 +1,5 @@
 /**
- * AI-JobHunter v2.6 - Content Script
+ * AI-JobHunter v2.7 - Content Script
  * 编码: UTF-8
  * 仅负责：浮动按钮（打开侧边栏）、JD 提取、表单填写
  * 所有 UI 已移至 Chrome 侧边栏 (sidepanel)
