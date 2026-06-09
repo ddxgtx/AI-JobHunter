@@ -7,6 +7,35 @@
 // 点击扩展图标直接打开侧边栏
 chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {});
 
+// API 结果缓存
+const apiCache = {
+  _cache: new Map(),
+  _maxAge: 5 * 60 * 1000, // 5 分钟缓存
+  
+  get(key) {
+    const item = this._cache.get(key);
+    if (!item) return null;
+    if (Date.now() - item.timestamp > this._maxAge) {
+      this._cache.delete(key);
+      return null;
+    }
+    return item.value;
+  },
+  
+  set(key, value) {
+    // 限制缓存大小
+    if (this._cache.size > 50) {
+      const firstKey = this._cache.keys().next().value;
+      this._cache.delete(firstKey);
+    }
+    this._cache.set(key, { value, timestamp: Date.now() });
+  },
+  
+  clear() {
+    this._cache.clear();
+  }
+};
+
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'openSidePanel') {
     if (sender.tab && sender.tab.id) {
@@ -119,6 +148,13 @@ function resolveAPIEndpoint(config) {
 async function callAPI(config, prompt, retries) {
   retries = retries ?? 2;
   const { url: apiUrl, model } = resolveAPIEndpoint(config);
+  
+  // 检查缓存
+  const cacheKey = `${model}:${prompt.substring(0, 200)}`;
+  const cached = apiCache.get(cacheKey);
+  if (cached) {
+    return cached;
+  }
 
   for (let attempt = 0; attempt <= retries; attempt++) {
     let timeoutId;
@@ -158,7 +194,12 @@ async function callAPI(config, prompt, retries) {
 
       const data = await resp.json();
       if (!data.choices?.[0]?.message?.content) throw new Error('API 返回格式异常');
-      return data.choices[0].message.content.trim();
+      const result = data.choices[0].message.content.trim();
+      
+      // 存入缓存
+      apiCache.set(cacheKey, result);
+      
+      return result;
     } catch (e) {
       if (timeoutId) clearTimeout(timeoutId);
       const isAbort = e.name === 'AbortError';

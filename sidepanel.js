@@ -1065,9 +1065,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
         let score = 0;
 
-        // Score based on core keywords (high weight)
+        // Score based on core keywords with position weight
+        // Keywords appearing earlier in the text get higher weight
         for (const [kw, weight] of Object.entries(coreKeywords)) {
-          if (text.includes(kw)) score += weight;
+          const idx = text.indexOf(kw);
+          if (idx >= 0) {
+            // Position weight: keywords in first 30% get 1.5x boost
+            const positionFactor = idx < text.length * 0.3 ? 1.5 : 1.0;
+            score += Math.round(weight * positionFactor);
+          }
         }
 
         // Score based on secondary keywords (lower weight)
@@ -1096,6 +1102,10 @@ document.addEventListener('DOMContentLoaded', () => {
         // Bonus for containing numbers (requirements often have numbers)
         const numbers = text.match(/\d+[\s]*[年月天Kk]/g);
         if (numbers && numbers.length >= 1 && numbers.length <= 5) score += 20;
+
+        // Bonus for structured content (ordered/unordered lists)
+        const hasList = el.querySelector('ul, ol') !== null;
+        if (hasList) score += 25;
 
         if (score > bestScore) { bestScore = score; bestEl = el; }
       }

@@ -532,9 +532,14 @@
 
     // 关键词检测
     if (!jdText || jdText.length < 50) {
-      var jdKeywords = ['岗位职责', '任职要求', '职位描述', '岗位要求', '职位要求', '工作职责', '任职资格', '工作内容', '加分项'];
+      var jdKeywords = {
+        '岗位职责': 150, '任职要求': 150, '职位描述': 150, '岗位要求': 150,
+        '工作职责': 140, '任职资格': 140, '工作内容': 140, '职位要求': 140,
+        '我们需要': 120, '我们希望': 120, '你需要': 120, '加分项': 100, '优先': 90, '负责': 80
+      };
+      var secondaryKeywords = ['技能', '经验', '学历', '专业', '熟悉', '了解', '掌握', '开发', '设计', '管理', '分析', '沟通', '团队'];
       var bestEl = null, bestScore = 0;
-      var candidates = document.querySelectorAll('div, section, article');
+      var candidates = document.querySelectorAll('div, section, article, li, p');
 
       for (var j = 0; j < candidates.length; j++) {
         var el = candidates[j];
@@ -543,8 +548,17 @@
         if (el.querySelectorAll('div').length > 10) continue;
 
         var score = 0;
-        for (var k = 0; k < jdKeywords.length; k++) {
-          if (text.includes(jdKeywords[k])) score += 150;
+        // 核心关键词评分（带位置权重）
+        for (var kw in jdKeywords) {
+          var idx = text.indexOf(kw);
+          if (idx >= 0) {
+            var positionFactor = idx < text.length * 0.3 ? 1.5 : 1.0;
+            score += Math.round(jdKeywords[kw] * positionFactor);
+          }
+        }
+        // 次要关键词评分
+        for (var k = 0; k < secondaryKeywords.length; k++) {
+          if (text.includes(secondaryKeywords[k])) score += 20;
         }
 
         var chinese = (text.match(/[\u4e00-\u9fff]/g) || []).length;
@@ -552,7 +566,14 @@
         score += chinese * 0.5;
 
         if (text.length >= 100 && text.length <= 2000) score += 50;
-        if (el.querySelectorAll('li').length >= 3) score += 30;
+        else if (text.length > 2000 && text.length <= 3000) score += 20;
+        else if (text.length > 3000) score -= 50;
+
+        var listItems = el.querySelectorAll('li').length;
+        if (listItems >= 3 && listItems <= 15) score += 30;
+
+        var hasList = el.querySelector('ul, ol') !== null;
+        if (hasList) score += 25;
 
         if (score > bestScore) { bestScore = score; bestEl = el; }
       }
@@ -749,6 +770,34 @@
       return Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
     }
 
+    // 模糊匹配函数
+    function fuzzyMatch(text, value) {
+      if (!text || !value) return 0;
+      text = text.toLowerCase().trim();
+      value = value.toLowerCase().trim();
+      
+      // 完全匹配
+      if (text === value) return 100;
+      // 包含匹配
+      if (text.includes(value) || value.includes(text)) return 80;
+      // 前缀匹配
+      if (text.startsWith(value) || value.startsWith(text)) return 70;
+      
+      // 计算共同字符数
+      var commonChars = 0;
+      var shorter = text.length < value.length ? text : value;
+      var longer = text.length < value.length ? value : text;
+      for (var i = 0; i < shorter.length; i++) {
+        if (longer.includes(shorter[i])) commonChars++;
+      }
+      var similarity = commonChars / longer.length;
+      
+      // 相似度超过 60% 认为匹配
+      if (similarity >= 0.6) return Math.round(similarity * 60);
+      
+      return 0;
+    }
+
     mappings.forEach(function(m) {
       try {
         var el = document.querySelector(m.selector);
@@ -758,19 +807,29 @@
         }
 
         if (el.tagName === 'SELECT') {
-          var matched = false;
+          var bestMatch = null;
+          var bestScore = 0;
+          
           for (var i = 0; i < el.options.length; i++) {
             var opt = el.options[i];
-            if (opt.value === m.value || opt.textContent.trim() === m.value || 
-                opt.textContent.includes(m.value) || m.value.includes(opt.textContent.trim())) {
-              el.value = opt.value;
-              matched = true;
-              break;
+            var optText = opt.textContent.trim();
+            var optValue = opt.value;
+            
+            // 计算匹配分数
+            var textScore = fuzzyMatch(optText, m.value);
+            var valueScore = fuzzyMatch(optValue, m.value);
+            var maxScore = Math.max(textScore, valueScore);
+            
+            if (maxScore > bestScore) {
+              bestScore = maxScore;
+              bestMatch = opt;
             }
           }
-          if (matched) {
+          
+          if (bestMatch && bestScore >= 50) {
+            el.value = bestMatch.value;
             fireEvents(el);
-            report.push({ field: m.fieldName || m.selector, status: 'ok', detail: '已选择: ' + el.options[el.selectedIndex]?.textContent });
+            report.push({ field: m.fieldName || m.selector, status: 'ok', detail: '已选择: ' + bestMatch.textContent.trim() + ' (匹配度:' + bestScore + '%)' });
           } else {
             report.push({ field: m.fieldName || m.selector, status: 'fail', detail: '未找到匹配选项' });
           }
