@@ -66,8 +66,7 @@ document.addEventListener('DOMContentLoaded', () => {
       $('panel-' + tab.dataset.tab).classList.add('active');
       if (tab.dataset.tab === 'history') loadHistory();
       if (tab.dataset.tab === 'md') loadMd();
-      if (tab.dataset.tab === 'pipeline') loadPipeline();
-      if (tab.dataset.tab === 'search') loadSearchDefaults();
+      // pipeline and search merged into jobs tab
     });
   });
 
@@ -104,6 +103,24 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // ====== Load saved ======
+  // ====== Dark Mode ======
+  const darkModeToggle = $('darkModeToggle');
+  if (darkModeToggle) {
+    chrome.storage.local.get(['darkMode'], dm => {
+      if (dm.darkMode) {
+        document.documentElement.setAttribute('data-theme', 'dark');
+        darkModeToggle.checked = true;
+        const icon = $('themeIcon'); if (icon) icon.textContent = '☀️';
+      }
+    });
+    darkModeToggle.addEventListener('change', () => {
+      const isDark = darkModeToggle.checked;
+      document.documentElement.setAttribute('data-theme', isDark ? 'dark' : '');
+      chrome.storage.local.set({ darkMode: isDark });
+      const icon = $('themeIcon'); if (icon) icon.textContent = isDark ? '☀️' : '🌙';
+    });
+  }
+
   chrome.storage.local.get(['apiKey','apiUrl','model','customModel','resume','resumeMD','useApiExtract'], data => {
     if (data.apiKey) apiKeyInput.value = data.apiKey;
     if (data.apiUrl) apiUrlInput.value = data.apiUrl;
@@ -1414,6 +1431,47 @@ document.addEventListener('DOMContentLoaded', () => {
         if (item?.url) chrome.tabs.create({ url: item.url });
       });
     });
+  }
+
+    // ====== Negotiation Scripts ======
+  const negotiationBtn = $('negotiationBtn');
+  if (negotiationBtn) {
+    negotiationBtn.addEventListener('click', async () => {
+      const jd = jdInput.value.trim();
+      if (!jd) return toast(greetStatus, '请先获取 JD', 'err');
+      negotiationBtn.disabled = true;
+      negotiationBtn.innerHTML = '<span class="spin" style="border-top-color:var(--accent);"></span>生成中...';
+      try {
+        const resp = await chrome.runtime.sendMessage({ action: 'negotiationScripts', jd });
+        if (resp?.success) {
+          displayNegotiationResults(resp);
+          toast(greetStatus, '谈判脚本已生成', 'ok');
+        } else {
+          toast(greetStatus, resp?.error || '生成失败', 'err');
+        }
+      } catch (e) {
+        toast(greetStatus, '生成失败: ' + e.message, 'err');
+      } finally {
+        negotiationBtn.disabled = false;
+        negotiationBtn.textContent = '🤝 谈判脚本';
+      }
+    });
+  }
+
+  function displayNegotiationResults(result) {
+    const section = $('negotiationSection');
+    const container = $('negotiationResults');
+    if (!section || !container) return;
+    section.style.display = 'block';
+    let html = '';
+    if (result.framework) html += '<div style="padding:10px;background:var(--accent-soft);border-radius:8px;margin-bottom:10px;font-size:12px;line-height:1.6;">' + esc(result.framework) + '</div>';
+    if (result.counterOffer) html += '<div style="margin-bottom:10px;"><div style="font-weight:500;margin-bottom:4px;">💬 还价话术</div><div style="font-size:12px;padding:8px;background:var(--fill);border-radius:6px;white-space:pre-wrap;">' + esc(result.counterOffer) + '</div></div>';
+    if (result.leverage) html += '<div style="margin-bottom:10px;"><div style="font-weight:500;margin-bottom:4px;">🎯 谈判筹码</div><div style="font-size:12px;line-height:1.6;">' + esc(result.leverage) + '</div></div>';
+    if (result.tips?.length) {
+      html += '<div style="margin-bottom:8px;"><div style="font-weight:500;">💡 注意事项</div></div>';
+      result.tips.forEach(t => { html += '<div style="font-size:12px;padding:2px 0;">• ' + esc(t) + '</div>'; });
+    }
+    container.innerHTML = html;
   }
 
     // ====== History ======

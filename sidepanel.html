@@ -7,6 +7,13 @@
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
+    [data-theme="dark"] {
+      --bg: #1c1c1e; --surface: #2c2c2e; --text-primary: #f2f2f7;
+      --text-secondary: #98989f; --text-tertiary: #636366;
+      --separator: rgba(255,255,255,0.08); --fill: #3a3a3c;
+      --grouped-bg: #1c1c1e;
+    }
+
     :root {
       --bg: #f2f2f7;
       --surface: #ffffff;
@@ -644,13 +651,11 @@
   <div class="nav-bar">
     <div class="nav-title">AI-JobHunter</div>
     <div class="segmented-control">
-      <div class="seg-item active" data-tab="greeting">生成话术</div>
-      <div class="seg-item" data-tab="resume">简历填写</div>
-      <div class="seg-item" data-tab="md">简历文档</div>
-      <div class="seg-item" data-tab="jobs">职位管理</div>
+      <div class="seg-item active" data-tab="greeting">话术</div>
+      <div class="seg-item" data-tab="resume">简历</div>
+      <div class="seg-item" data-tab="md">文档</div>
+      <div class="seg-item" data-tab="jobs">求职</div>
       <div class="seg-item" data-tab="history">历史</div>
-      <div class="seg-item" data-tab="search">搜索</div>
-      <div class="seg-item" data-tab="pipeline">求职</div>
     </div>
   </div>
 
@@ -699,6 +704,7 @@
           <button class="btn btn-secondary" id="linkedinBtn" style="flex:1;font-size:12px;padding:8px;">💼 LinkedIn</button>
           <button class="btn btn-secondary" id="companyResearchBtn" style="flex:1;font-size:12px;padding:8px;">🏢 公司研究</button>
           <button class="btn btn-secondary" id="jobEvalBtn" style="flex:1;font-size:12px;padding:8px;">📋 职位评估</button>
+          <button class="btn btn-secondary" id="negotiationBtn" style="flex:1;font-size:12px;padding:8px;">🤝 谈判脚本</button>
         </div>
       </div>
       <div class="skill-section" id="skillSection" style="padding:0 16px 12px;">
@@ -746,6 +752,11 @@
       <div id="companySection" style="display:none;padding:12px 16px;">
         <div style="font-size:12px;color:var(--text-secondary);margin-bottom:8px;">🏢 公司研究</div>
         <div id="companyResults" style="font-size:13px;line-height:1.6;"></div>
+      </div>
+      <!-- 谈判脚本 -->
+      <div id="negotiationSection" style="display:none;padding:12px 16px;">
+        <div style="font-size:12px;color:var(--text-secondary);margin-bottom:8px;">🤝 薪资谈判脚本</div>
+        <div id="negotiationResults" style="font-size:13px;line-height:1.6;"></div>
       </div>
       <!-- 职位评估 -->
       <div id="evalSection" style="display:none;padding:12px 16px;">

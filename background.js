@@ -1,5 +1,5 @@
 /**
- * AI-JobHunter v2.7 - Background Service Worker
+ * AI-JobHunter v3.0 - Background Service Worker
  * 编码: UTF-8
  * 处理来自 content script 和 popup 的 API 调用请求
  */
@@ -853,5 +853,33 @@ async function handleJobEvaluation(jdText, resume) {
     return JSON.parse(jsonStr);
   } catch (e) {
     return { overallGrade: '-', overallScore: 0, dimensions: [], recommendation: '\u89e3\u6790\u5931\u8d25' };
+  }
+}
+
+async function handleNegotiationScripts(jdText) {
+  const config = await getConfig();
+  if (!config.apiKey) throw new Error('\u8bf7\u5148\u914d\u7f6e API Key');
+  const r = config.resume || {};
+  const resumeLines = [];
+  if (r.r_title) resumeLines.push('\u804c\u4f4d：' + r.r_title);
+  if (r.r_exp) resumeLines.push('\u7ecf\u9a8c：' + r.r_exp);
+  if (r.r_edu) resumeLines.push('\u5b66\u5386：' + r.r_edu);
+  if (r.r_salary) resumeLines.push('\u671f\u671b\u85aa\u8d44：' + r.r_salary);
+
+  const prompt = '\u4f60\u662f\u4e00\u4f4d\u8d44\u6df1\u85aa\u8d44\u8c08\u5224\u987e\u95ee\u3002\u6839\u636e\u4ee5\u4e0b JD \u548c\u7b80\u5386\u4fe1\u606f\uff0c\u751f\u6210\u85aa\u8d44\u8c08\u5224\u811a\u672c\u3002\n\n' +
+    '\u7b80\u5386：\n' + resumeLines.join('\n') + '\n\n' +
+    '\u804c\u4f4d\u63cf\u8ff0：\n' + jdText.substring(0, 2000) + '\n\n' +
+    '\u8bf7\u8fd4\u56de JSON \u5bf9\u8c61：\n{\n' +
+    '  "framework": "\u6574\u4f53\u8c08\u5224\u6846\u67b6\u548c\u7b56\u7565",\n' +
+    '  "counterOffer": "\u5177\u4f53\u7684\u8fd8\u4ef7\u8bdd\u672f\u548c\u7406\u7531",\n' +
+    '  "leverage": "\u53ef\u4ee5\u4f7f\u7528\u7684\u8c08\u5224\u7b79\u7801\u548c\u4f18\u52bf",\n' +
+    '  "tips": ["\u8c08\u5224\u6ce8\u610f\u4e8b\u9879\u548c\u5efa\u8bae"]\n}\n\n' +
+    '\u89c4\u5219：\n1. framework 50-100\u5b57\uff0c\u63d0\u4f9b\u8c08\u5224\u7684\u6574\u4f53\u601d\u8def\n2. counterOffer \u63d0\u4f9b\u5177\u4f53\u7684\u8bdd\u672f\u6587\u672c\uff0c\u53ef\u4ee5\u76f4\u63a5\u4f7f\u7528\n3. leverage \u5217\u51fa\u53ef\u4ee5\u7528\u4f5c\u8c08\u5224\u7b79\u7801\u7684\u7ecf\u5386/\u6280\u80fd/\u5e02\u573a\u884c\u60c5\n4. tips 3-5\u6761\u5b9e\u7528\u5efa\u8bae\n5. \u53ea\u8f93\u51fa JSON';
+  const result = await callAPI(config, prompt, 0);
+  try {
+    const jsonStr = result.match(/\{[\s\S]*\}/)?.[0] || result;
+    return JSON.parse(jsonStr);
+  } catch (e) {
+    return { framework: '', counterOffer: '', leverage: '', tips: ['\u89e3\u6790\u5931\u8d25'] };
   }
 }
