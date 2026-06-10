@@ -613,6 +613,31 @@
       color: var(--text-tertiary);
       margin-top: 4px;
     }
+    /* Search results */
+    .search-job-item {
+      padding:10px 16px;
+      border-bottom:0.5px solid var(--separator);
+      cursor:pointer;
+      transition:background 0.15s;
+    }
+    .search-job-item:last-child { border-bottom:none; }
+    .search-job-item:active { background:var(--grouped-bg); }
+    .search-job-title { font-size:13px;font-weight:500;color:var(--text-primary); }
+    .search-job-company { font-size:12px;color:var(--accent);margin-top:2px; }
+    .search-job-meta { font-size:11px;color:var(--text-tertiary);margin-top:2px; }
+    .search-link-item {
+      display:flex;
+      align-items:center;
+      gap:8px;
+      padding:6px 0;
+      font-size:13px;
+    }
+    .search-link-item a {
+      color:var(--accent);
+      text-decoration:none;
+      flex:1;
+    }
+    .search-link-item a:hover { text-decoration:underline; }
   </style>
 </head>
 <body>
@@ -624,6 +649,7 @@
       <div class="seg-item" data-tab="md">简历文档</div>
       <div class="seg-item" data-tab="jobs">职位管理</div>
       <div class="seg-item" data-tab="history">历史</div>
+      <div class="seg-item" data-tab="search">搜索</div>
       <div class="seg-item" data-tab="pipeline">求职</div>
     </div>
   </div>
@@ -918,6 +944,48 @@
     <div class="btn-row" style="display:flex;gap:8px;">
       <button class="btn btn-secondary" id="clearHistory" style="flex:1;">清空历史</button>
       <button class="btn btn-secondary" id="exportHistory" style="flex:1;">导出历史</button>
+    </div>
+  </div>
+
+  <!-- 职位搜索 -->
+  <div class="tab-panel" id="panel-search">
+    <div class="group">
+      <div class="cell">
+        <span class="cell-label">关键词</span>
+        <input type="text" class="cell-input" id="searchKeyword" placeholder="Python、前端、产品经理...">
+      </div>
+      <div class="cell">
+        <span class="cell-label">城市</span>
+        <input type="text" class="cell-input" id="searchCity" placeholder="北京、上海、深圳...">
+      </div>
+    </div>
+    <div class="group">
+      <div class="group-header">搜索平台</div>
+      <div style="padding:8px 16px 12px;display:flex;flex-wrap:wrap;gap:6px;" id="platformChecks">
+        <label style="font-size:12px;display:flex;align-items:center;gap:4px;"><input type="checkbox" checked data-platform="zhipin"> Boss直聘</label>
+        <label style="font-size:12px;display:flex;align-items:center;gap:4px;"><input type="checkbox" checked data-platform="liepin"> 猎聘</label>
+        <label style="font-size:12px;display:flex;align-items:center;gap:4px;"><input type="checkbox" checked data-platform="51job"> 前程无忧</label>
+        <label style="font-size:12px;display:flex;align-items:center;gap:4px;"><input type="checkbox" checked data-platform="zhaopin"> 智联招聘</label>
+        <label style="font-size:12px;display:flex;align-items:center;gap:4px;"><input type="checkbox" data-platform="lagou"> 拉勾</label>
+        <label style="font-size:12px;display:flex;align-items:center;gap:4px;"><input type="checkbox" data-platform="kanzhun"> 看准网</label>
+        <label style="font-size:12px;display:flex;align-items:center;gap:4px;"><input type="checkbox" data-platform="58"> 58同城</label>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-accent" id="searchJobsBtn">🔍 搜索职位</button>
+      <div id="searchStatus" class="toast" style="display:none;"></div>
+    </div>
+    <div id="searchResults" style="display:none;margin-top:12px;">
+      <div class="group">
+        <div class="group-header">搜索结果</div>
+        <div id="searchResultsList"></div>
+      </div>
+    </div>
+    <div id="searchLinks" style="display:none;margin-top:12px;">
+      <div class="group">
+        <div class="group-header">快速搜索链接</div>
+        <div id="searchLinksList" style="padding:8px 16px 12px;"></div>
+      </div>
     </div>
   </div>
 

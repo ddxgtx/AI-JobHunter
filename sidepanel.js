@@ -67,6 +67,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (tab.dataset.tab === 'history') loadHistory();
       if (tab.dataset.tab === 'md') loadMd();
       if (tab.dataset.tab === 'pipeline') loadPipeline();
+      if (tab.dataset.tab === 'search') loadSearchDefaults();
     });
   });
 
@@ -1165,6 +1166,252 @@ document.addEventListener('DOMContentLoaded', () => {
         a.click();
         URL.revokeObjectURL(url);
         toast($('pipelineStatus'), '已导出 ' + pipeline.length + ' 条记录', 'ok');
+      });
+    });
+  }
+
+    // ====== Job Search ======
+  // Job listing extraction function (injected into page via executeScript)
+  function extractJobListings() {
+    const url = window.location.href;
+    const listings = [];
+    const seen = new Set();
+
+    // Boss直聘
+    if (url.includes('zhipin.com')) {
+      document.querySelectorAll('.job-card-wrapper, .search-job-result li').forEach(el => {
+        const title = el.querySelector('.job-name, .job-title')?.textContent?.trim();
+        const company = el.querySelector('.company-name a, .company-name')?.textContent?.trim();
+        const salary = el.querySelector('.salary, .job-limit .red')?.textContent?.trim();
+        const location = el.querySelector('.job-area')?.textContent?.trim();
+        const link = el.querySelector('a[href*="/job_detail"]')?.href;
+        if (title && !seen.has(title + company)) {
+          seen.add(title + company);
+          listings.push({ title, company, salary, location, url: link || '' });
+        }
+      });
+    }
+
+    // 猎聘
+    if (url.includes('liepin.com')) {
+      document.querySelectorAll('.job-list-item, .job-card-pc-container').forEach(el => {
+        const title = el.querySelector('.job-title-box .ellipsis-1, .job-title')?.textContent?.trim();
+        const company = el.querySelector('.company-name, .company-title')?.textContent?.trim();
+        const salary = el.querySelector('.job-salary, .salary')?.textContent?.trim();
+        const link = el.querySelector('a')?.href;
+        if (title && !seen.has(title + company)) {
+          seen.add(title + company);
+          listings.push({ title, company, salary, location: '', url: link || '' });
+        }
+      });
+    }
+
+    // 前程无忧
+    if (url.includes('51job.com')) {
+      document.querySelectorAll('.j_joblist .e, .joblist-box__item').forEach(el => {
+        const title = el.querySelector('.jname .job_name, .t a')?.textContent?.trim();
+        const company = el.querySelector('.cname, .company_name a')?.textContent?.trim();
+        const salary = el.querySelector('.sal, .job_sar')?.textContent?.trim();
+        const link = el.querySelector('.jname a, .t a')?.href;
+        if (title && !seen.has(title + company)) {
+          seen.add(title + company);
+          listings.push({ title, company, salary, location: '', url: link || '' });
+        }
+      });
+    }
+
+    // 智联招聘
+    if (url.includes('zhaopin.com')) {
+      document.querySelectorAll('.positionlist .positionlist-item, .joblist-box__item, .soujob-list .clearfix').forEach(el => {
+        const title = el.querySelector('.nameinfo a, .job_name, a.iteminfo__line1__jobname')?.textContent?.trim();
+        const company = el.querySelector('.company_name a, .comp_name, a.iteminfo__line1__compname')?.textContent?.trim();
+        const salary = el.querySelector('.salary_info, .job_sar, p.iteminfo__line2__jobdesc__salary')?.textContent?.trim();
+        const link = el.querySelector('.nameinfo a, a.iteminfo__line1__jobname')?.href;
+        if (title && !seen.has(title + company)) {
+          seen.add(title + company);
+          listings.push({ title, company, salary, location: '', url: link || '' });
+        }
+      });
+    }
+
+    // 拉勾
+    if (url.includes('lagou.com')) {
+      document.querySelectorAll('.list_item_top, .job-list li').forEach(el => {
+        const title = el.querySelector('.position_name, .job_name')?.textContent?.trim();
+        const company = el.querySelector('.company_name, .company')?.textContent?.trim();
+        const salary = el.querySelector('.position_salary, .salary')?.textContent?.trim();
+        const link = el.querySelector('a')?.href;
+        if (title && !seen.has(title + company)) {
+          seen.add(title + company);
+          listings.push({ title, company, salary, location: '', url: link || '' });
+        }
+      });
+    }
+
+    // 看准网
+    if (url.includes('kanzhun.com')) {
+      document.querySelectorAll('.search-result-item, .job-card').forEach(el => {
+        const title = el.querySelector('.job-name, .job-title')?.textContent?.trim();
+        const company = el.querySelector('.company-name')?.textContent?.trim();
+        const salary = el.querySelector('.salary')?.textContent?.trim();
+        const link = el.querySelector('a')?.href;
+        if (title && !seen.has(title + company)) {
+          seen.add(title + company);
+          listings.push({ title, company, salary, location: '', url: link || '' });
+        }
+      });
+    }
+
+    // 58同城
+    if (url.includes('58.com')) {
+      document.querySelectorAll('.job_item, .list_item').forEach(el => {
+        const title = el.querySelector('.job_name, .item_con .job_title')?.textContent?.trim();
+        const company = el.querySelector('.comp_name, .comp_name_item')?.textContent?.trim();
+        const salary = el.querySelector('.job_salary, .salary')?.textContent?.trim();
+        const link = el.querySelector('a')?.href;
+        if (title && !seen.has(title + company)) {
+          seen.add(title + company);
+          listings.push({ title, company, salary, location: '', url: link || '' });
+        }
+      });
+    }
+
+    return listings.length > 0 ? listings.slice(0, 50) : null;
+  }
+
+  function loadSearchDefaults() {
+    chrome.storage.local.get(['searchKeyword', 'searchCity'], data => {
+      const kw = $('searchKeyword');
+      const ct = $('searchCity');
+      if (kw && data.searchKeyword) kw.value = data.searchKeyword;
+      if (ct && data.searchCity) ct.value = data.searchCity;
+    });
+  }
+
+  const searchJobsBtn = $('searchJobsBtn');
+  if (searchJobsBtn) {
+    searchJobsBtn.addEventListener('click', async () => {
+      const keyword = $('searchKeyword')?.value?.trim();
+      const city = $('searchCity')?.value?.trim();
+      if (!keyword) return toast($('searchStatus'), '请输入搜索关键词', 'err');
+
+      // Save search preferences
+      chrome.storage.local.set({ searchKeyword: keyword, searchCity: city });
+
+      // Get selected platforms
+      const platforms = [];
+      document.querySelectorAll('#platformChecks input[type="checkbox"]:checked').forEach(cb => {
+        platforms.push(cb.dataset.platform);
+      });
+      if (!platforms.length) return toast($('searchStatus'), '请选择至少一个平台', 'err');
+
+      // Generate search URLs
+      const urls = generateSearchUrls(keyword, city, platforms);
+      displaySearchLinks(urls);
+
+      // Extract job listings from current page if on a search results page
+      try {
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        const url = tab.url || '';
+        const isSearchPage = platforms.some(p => url.includes(p));
+        if (isSearchPage) {
+          const result = await chrome.scripting.executeScript({
+            target: { tabId: tab.id },
+            func: extractJobListings
+          });
+          const listings = result?.[0]?.result;
+          if (listings?.length) {
+            displaySearchResults(listings);
+            toast($('searchStatus'), '从当前页面提取到 ' + listings.length + ' 个职位', 'ok');
+          } else {
+            toast($('searchStatus'), '已生成搜索链接，请点击打开', 'ok');
+          }
+        } else {
+          toast($('searchStatus'), '已生成搜索链接，请点击打开', 'ok');
+        }
+      } catch (e) {
+        toast($('searchStatus'), '已生成搜索链接', 'ok');
+      }
+    });
+  }
+
+  function generateSearchUrls(keyword, city, platforms) {
+    const kw = encodeURIComponent(keyword);
+    const ct = encodeURIComponent(city || '');
+    const urls = [];
+    const platformDefs = {
+      zhipin: {
+        name: 'Boss直聘',
+        url: 'https://www.zhipin.com/web/geek/job?query=' + kw + (city ? '&city=' + ct : ''),
+        icon: '💼'
+      },
+      liepin: {
+        name: '猎聘',
+        url: 'https://www.liepin.com/zhaopin/?key=' + kw + (city ? '&dq=' + ct : ''),
+        icon: '🦁'
+      },
+      '51job': {
+        name: '前程无忧',
+        url: 'https://we.51job.com/pc/search?searchKey=' + kw + (city ? '&searchType=2&jobArea=' + ct : ''),
+        icon: '📋'
+      },
+      zhaopin: {
+        name: '智联招聘',
+        url: 'https://sou.zhaopin.com/?jl=&kw=' + kw + (city ? '&city=' + ct : ''),
+        icon: '🔗'
+      },
+      lagou: {
+        name: '拉勾',
+        url: 'https://www.lagou.com/wn/jobs?kd=' + kw + (city ? '&city=' + ct : ''),
+        icon: '🚀'
+      },
+      kanzhun: {
+        name: '看准网',
+        url: 'https://www.kanzhun.com/search/?query=' + kw + (city ? '&city=' + ct : ''),
+        icon: '👀'
+      },
+      '58': {
+        name: '58同城',
+        url: 'https://search.58.com/?key=' + kw + (city ? '&claession=' + ct : ''),
+        icon: '🏠'
+      }
+    };
+    platforms.forEach(p => {
+      if (platformDefs[p]) urls.push(platformDefs[p]);
+    });
+    return urls;
+  }
+
+  function displaySearchLinks(urls) {
+    const container = $('searchLinksList');
+    const section = $('searchLinks');
+    if (!container || !section) return;
+    section.style.display = 'block';
+    container.innerHTML = urls.map(u => {
+      return '<div class="search-link-item">' +
+        '<span>' + u.icon + '</span>' +
+        '<a href="' + u.url + '" target="_blank" rel="noopener">' + u.name + '</a>' +
+        '</div>';
+    }).join('');
+  }
+
+  function displaySearchResults(listings) {
+    const container = $('searchResultsList');
+    const section = $('searchResults');
+    if (!container || !section) return;
+    section.style.display = 'block';
+    container.innerHTML = listings.map((item, i) => {
+      return '<div class="search-job-item" data-idx="' + i + '">' +
+        '<div class="search-job-title">' + esc(item.title || '') + '</div>' +
+        '<div class="search-job-company">' + esc(item.company || '') + '</div>' +
+        '<div class="search-job-meta">' + [item.salary, item.location, item.experience].filter(Boolean).join(' · ') + '</div>' +
+        '</div>';
+    }).join('');
+
+    container.querySelectorAll('.search-job-item').forEach(el => {
+      el.addEventListener('click', () => {
+        const item = listings[parseInt(el.dataset.idx)];
+        if (item?.url) chrome.tabs.create({ url: item.url });
       });
     });
   }
