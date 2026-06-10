@@ -624,6 +624,7 @@
       <div class="seg-item" data-tab="md">简历文档</div>
       <div class="seg-item" data-tab="jobs">职位管理</div>
       <div class="seg-item" data-tab="history">历史</div>
+      <div class="seg-item" data-tab="pipeline">求职</div>
     </div>
   </div>
 
@@ -668,6 +669,11 @@
           <button class="btn btn-secondary" id="coverLetterBtn" style="flex:1;font-size:12px;padding:8px;">✉️ 求职信</button>
           <button class="btn btn-secondary" id="salaryAnalysisBtn" style="flex:1;font-size:12px;padding:8px;">💰 薪资分析</button>
         </div>
+        <div style="display:flex;gap:8px;margin-top:6px;">
+          <button class="btn btn-secondary" id="linkedinBtn" style="flex:1;font-size:12px;padding:8px;">💼 LinkedIn</button>
+          <button class="btn btn-secondary" id="companyResearchBtn" style="flex:1;font-size:12px;padding:8px;">🏢 公司研究</button>
+          <button class="btn btn-secondary" id="jobEvalBtn" style="flex:1;font-size:12px;padding:8px;">📋 职位评估</button>
+        </div>
       </div>
       <div class="skill-section" id="skillSection" style="padding:0 16px 12px;">
         <div style="font-size:12px;color:var(--text-secondary);margin-bottom:8px;">关键技能要求</div>
@@ -701,6 +707,24 @@
       <div id="salarySection" style="display:none;padding:12px 16px;">
         <div style="font-size:12px;color:var(--text-secondary);margin-bottom:8px;">💰 薪资分析</div>
         <div id="salaryResults" style="font-size:13px;line-height:1.6;"></div>
+      </div>
+      <!-- LinkedIn -->
+      <div id="linkedinSection" style="display:none;padding:12px 16px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+          <span style="font-size:12px;color:var(--text-secondary);">💼 LinkedIn 外联消息</span>
+          <button class="btn btn-secondary" id="copyLinkedin" style="width:auto;padding:4px 10px;font-size:11px;">复制</button>
+        </div>
+        <div id="linkedinContent" style="font-size:13px;line-height:1.7;white-space:pre-wrap;background:var(--fill);padding:12px;border-radius:8px;"></div>
+      </div>
+      <!-- 公司研究 -->
+      <div id="companySection" style="display:none;padding:12px 16px;">
+        <div style="font-size:12px;color:var(--text-secondary);margin-bottom:8px;">🏢 公司研究</div>
+        <div id="companyResults" style="font-size:13px;line-height:1.6;"></div>
+      </div>
+      <!-- 职位评估 -->
+      <div id="evalSection" style="display:none;padding:12px 16px;">
+        <div style="font-size:12px;color:var(--text-secondary);margin-bottom:8px;">📋 职位评估</div>
+        <div id="evalResults" style="font-size:13px;line-height:1.6;"></div>
       </div>
     </div>
 
@@ -894,6 +918,34 @@
     <div class="btn-row" style="display:flex;gap:8px;">
       <button class="btn btn-secondary" id="clearHistory" style="flex:1;">清空历史</button>
       <button class="btn btn-secondary" id="exportHistory" style="flex:1;">导出历史</button>
+    </div>
+  </div>
+
+  <!-- 求职管道 -->
+  <div class="tab-panel" id="panel-pipeline">
+    <div class="group">
+      <div class="cell">
+        <span class="cell-label">状态筛选</span>
+        <select class="cell-select" id="pipelineFilter">
+          <option value="all">全部</option>
+          <option value="interested">感兴趣</option>
+          <option value="applied">已投递</option>
+          <option value="interview">面试中</option>
+          <option value="offer">已录取</option>
+          <option value="rejected">已拒绝</option>
+        </select>
+      </div>
+    </div>
+    <div class="group" id="pipelineList">
+      <div class="history-empty">暂无求职记录</div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-accent" id="addToPipeline">+ 记录当前职位</button>
+      <div class="action-bar" style="margin-top:8px;">
+        <button class="btn btn-secondary" id="clearPipeline" style="flex:1;">清空记录</button>
+        <button class="btn btn-secondary" id="exportPipeline" style="flex:1;">导出记录</button>
+      </div>
+      <div id="pipelineStatus" class="toast" style="display:none;"></div>
     </div>
   </div>
 

@@ -113,6 +113,27 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       .catch(err => sendResponse({ success: false, error: err.message }));
     return true;
   }
+
+  if (request.action === 'linkedinOutreach') {
+    handleLinkedinOutreach(request.jd, request.tone)
+      .then(message => sendResponse({ success: true, message }))
+      .catch(err => sendResponse({ success: false, error: err.message }));
+    return true;
+  }
+
+  if (request.action === 'companyResearch') {
+    handleCompanyResearch(request.jd)
+      .then(result => sendResponse({ success: true, ...result }))
+      .catch(err => sendResponse({ success: false, error: err.message }));
+    return true;
+  }
+
+  if (request.action === 'jobEvaluation') {
+    handleJobEvaluation(request.jd, request.resume)
+      .then(result => sendResponse({ success: true, ...result }))
+      .catch(err => sendResponse({ success: false, error: err.message }));
+    return true;
+  }
 });
 
 async function getConfig() {
@@ -749,5 +770,88 @@ ${jdText.substring(0, 2000)}
     return JSON.parse(jsonStr);
   } catch (e) {
     return { salaryRange: '无法判断', factors: [], marketTrend: '解析失败', negotiationTips: [] };
+  }
+}
+
+async function handleLinkedinOutreach(jdText, tone) {
+  const config = await getConfig();
+  if (!config.apiKey) throw new Error('请先配置 API Key');
+  const toneMap = { professional: '正式专业', friendly: '友好亲切', confident: '自信直接' };
+  const r = config.resume || {};
+  const resumeLines = [];
+  if (r.r_name) resumeLines.push('\u59d3\u540d：' + r.r_name);
+  if (r.r_title) resumeLines.push('\u804c\u4f4d：' + r.r_title);
+  if (r.r_exp) resumeLines.push('\u7ecf\u9a8c：' + r.r_exp);
+  if (r.r_company) resumeLines.push('\u516c\u53f8：' + r.r_company);
+  if (r.r_industry) resumeLines.push('\u884c\u4e1a：' + r.r_industry);
+  if (r.r_summary) resumeLines.push('\u4f18\u52bf：' + r.r_summary);
+
+  const prompt = '\u4f60\u662f\u4e00\u4f4d\u8d44\u6df1\u804c\u573a\u793e\u4ea4\u987e\u95ee\u3002\u6839\u636e\u4ee5\u4e0b JD \u548c\u7b80\u5386\uff0c\u751f\u6210\u4e00\u6761 LinkedIn \u8054\u7cfb\u4eba\u6d88\u606f\u3002\n\n' +
+    '\u98ce\u683c：' + (toneMap[tone] || toneMap.professional) + '\n\n' +
+    '\u7b80\u5386\u4fe1\u606f：\n' + resumeLines.join('\n') + '\n\n' +
+    '\u804c\u4f4d\u63cf\u8ff0：\n' + jdText.substring(0, 2000) + '\n\n' +
+    '\u8981\u6c42：\n1. 30-50 \u5b57\u7b80\u77ed\u6709\u529b\n2. \u5f00\u5934\u79f0\u547c\u5bf9\u65b9\uff0c\u7b80\u5355\u81ea\u6211\u4ecb\u7ecd\n3. \u8bf4\u660e\u4e3a\u4ec0\u4e48\u5bf9\u8fd9\u4e2a\u5c97\u4f4d\u611f\u5174\u8da3\n4. \u7a81\u51fa1-2\u4e2a\u4e0e JD \u6700\u5339\u914d\u7684\u7ecf\u5386\n5. \u7ed3\u5c3e\u8868\u8fbe\u671f\u5f85\u6c9f\u901a\n6. \u4e0d\u8981\u6a21\u677f\u5316\uff0c\u8bed\u6c14\u81ea\u7136\n7. \u76f4\u63a5\u8f93\u51fa\u6d88\u606f\u6b63\u6587';
+  return await callAPI(config, prompt);
+}
+
+async function handleCompanyResearch(jdText) {
+  const config = await getConfig();
+  if (!config.apiKey) throw new Error('\u8bf7\u5148\u914d\u7f6e API Key');
+  const prompt = '\u4f60\u662f\u4e00\u4f4d\u8d44\u6df1\u884c\u4e1a\u5206\u6790\u5e08\u3002\u6839\u636e\u4ee5\u4e0b\u804c\u4f4d\u63cf\u8ff0\uff0c\u63d0\u4f9b\u8be5\u516c\u53f8\u7684\u7814\u7a76\u5206\u6790\u3002\n\n' +
+    '\u804c\u4f4d\u63cf\u8ff0：\n' + jdText.substring(0, 2000) + '\n\n' +
+    '\u8bf7\u8fd4\u56de\u4e00\u4e2a JSON \u5bf9\u8c61：\n{\n' +
+    '  "companyName": "\u516c\u53f8\u540d\u79f0",\n' +
+    '  "industry": "\u884c\u4e1a\u9886\u57df",\n' +
+    '  "size": "\u53ef\u80fd\u7684\u89c4\u6a21",\n' +
+    '  "techStack": ["\u6280\u672f\u6808\u5217\u8868"],\n' +
+    '  "culture": "\u53ef\u80fd\u7684\u516c\u53f8\u6587\u5316\u7279\u70b9",\n' +
+    '  "pros": ["\u53ef\u80fd\u7684\u4f18\u52bf"],\n' +
+    '  "cons": ["\u53ef\u80fd\u7684\u98ce\u9669\u70b9"],\n' +
+    '  "interviewTips": "\u8be5\u516c\u53f8\u9762\u8bd5\u5efa\u8bae"\n}\n\n' +
+    '\u89c4\u5219：\n1. \u57fa\u4e8e JD \u4e2d\u7684\u4fe1\u606f\u63a8\u65ad\uff0c\u4e0d\u8981\u7f16\u9020\n2. \u6280\u672f\u6808\u63d0\u53d6\u5b9e\u9645\u7528\u5230\u7684\u6280\u672f\n3. \u4f18\u52bf\u548c\u98ce\u9669\u54043-5\u6761\n4. \u53ea\u8f93\u51fa JSON';
+  const result = await callAPI(config, prompt, 0);
+  try {
+    const jsonStr = result.match(/\{[\s\S]*\}/)?.[0] || result;
+    return JSON.parse(jsonStr);
+  } catch (e) {
+    return { companyName: '', industry: '', size: '', techStack: [], culture: '', pros: [], cons: [], interviewTips: '\u89e3\u6790\u5931\u8d25' };
+  }
+}
+
+async function handleJobEvaluation(jdText, resume) {
+  const config = await getConfig();
+  if (!config.apiKey) throw new Error('\u8bf7\u5148\u914d\u7f6e API Key');
+  const resumeLines = [];
+  if (resume.r_title) resumeLines.push('\u804c\u4f4d：' + resume.r_title);
+  if (resume.r_exp) resumeLines.push('\u7ecf\u9a8c：' + resume.r_exp);
+  if (resume.r_edu) resumeLines.push('\u5b66\u5386：' + resume.r_edu);
+  if (resume.r_industry) resumeLines.push('\u884c\u4e1a：' + resume.r_industry);
+  if (resume.r_salary) resumeLines.push('\u671f\u671b\u85aa\u8d44：' + resume.r_salary);
+  if (resume.r_city) resumeLines.push('\u57ce\u5e02：' + resume.r_city);
+  if (resume.r_summary) resumeLines.push('\u4f18\u52bf：' + resume.r_summary);
+
+  const prompt = '\u4f60\u662f\u4e00\u4f4d\u8d44\u6df1\u6c42\u804c\u987e\u95ee\u3002\u5bf9\u4ee5\u4e0b\u804c\u4f4d\u8fdb\u884c\u591a\u7ef4\u5ea6\u8bc4\u4f30\u3002\n\n' +
+    '\u7b80\u5386：\n' + resumeLines.join('\n') + '\n\n' +
+    '\u804c\u4f4d\u63cf\u8ff0：\n' + jdText.substring(0, 3000) + '\n\n' +
+    '\u8bf7\u8fd4\u56de JSON \u5bf9\u8c61：\n{\n' +
+    '  "overallGrade": "B+",\n' +
+    '  "overallScore": 78,\n' +
+    '  "dimensions": [\n' +
+    '    {"name": "\u6280\u672f\u5339\u914d", "score": 85, "weight": 25, "comment": "\u8bc4\u8bed"},\n' +
+    '    {"name": "\u7ecf\u9a8c\u5339\u914d", "score": 70, "weight": 20, "comment": "\u8bc4\u8bed"},\n' +
+    '    {"name": "\u5b66\u5386\u5339\u914d", "score": 90, "weight": 10, "comment": "\u8bc4\u8bed"},\n' +
+    '    {"name": "\u85aa\u8d44\u5339\u914d", "score": 75, "weight": 15, "comment": "\u8bc4\u8bed"},\n' +
+    '    {"name": "\u5730\u57df\u5339\u914d", "score": 100, "weight": 10, "comment": "\u8bc4\u8bed"},\n' +
+    '    {"name": "\u6210\u957f\u7a7a\u95f4", "score": 80, "weight": 10, "comment": "\u8bc4\u8bed"},\n' +
+    '    {"name": "\u516c\u53f8\u524d\u666f", "score": 65, "weight": 10, "comment": "\u8bc4\u8bed"}\n' +
+    '  ],\n' +
+    '  "recommendation": "\u662f\u5426\u63a8\u8350\u7533\u8bf7\u53ca\u539f\u56e0\n\u7efc\u5408\u8bc4\u5206\u57fa\u4e8e\u52a0\u6743\u5e73\u5747\u3002\u8bc4\u5206>=4.0\u63a8\u8350\u7533\u8bf7\uff0c<4.0\u4e0d\u63a8\u8350\u3002"\n}\n\n' +
+    '\u89c4\u5219：\n1. \u5206\u6570 0-100\n2. \u5206\u6570>=80\u4e3aA\uff0c>=60\u4e3aB\uff0c>=40\u4e3aC\uff0c<40\u4e3aD\n3. overallGrade: A+/A/A-/B+/B/B-/C+/C/C-/D\n4. overallScore = \u5404\u7ef4\u5ea6\u5206\u6570\u00d7\u6743\u91cd/100\u7684\u52a0\u6743\u5e73\u5747\n5. recommendation\u548c\u5206\u6570\u4e00\u81f4\n6. \u53ea\u8f93\u51fa JSON';
+  const result = await callAPI(config, prompt, 0);
+  try {
+    const jsonStr = result.match(/\{[\s\S]*\}/)?.[0] || result;
+    return JSON.parse(jsonStr);
+  } catch (e) {
+    return { overallGrade: '-', overallScore: 0, dimensions: [], recommendation: '\u89e3\u6790\u5931\u8d25' };
   }
 }

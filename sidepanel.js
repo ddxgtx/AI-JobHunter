@@ -66,6 +66,7 @@ document.addEventListener('DOMContentLoaded', () => {
       $('panel-' + tab.dataset.tab).classList.add('active');
       if (tab.dataset.tab === 'history') loadHistory();
       if (tab.dataset.tab === 'md') loadMd();
+      if (tab.dataset.tab === 'pipeline') loadPipeline();
     });
   });
 
@@ -886,6 +887,286 @@ document.addEventListener('DOMContentLoaded', () => {
       result.negotiationTips.forEach(t => { html += '<div style="font-size:12px;padding:3px 0;color:var(--text-secondary);">• ' + esc(t) + '</div>'; });
     }
     container.innerHTML = html;
+  }
+
+    // ====== LinkedIn Outreach ======
+  const linkedinBtn = $('linkedinBtn');
+  if (linkedinBtn) {
+    linkedinBtn.addEventListener('click', async () => {
+      const jd = jdInput.value.trim();
+      if (!jd) return toast(greetStatus, '请先获取 JD', 'err');
+      linkedinBtn.disabled = true;
+      linkedinBtn.innerHTML = '<span class="spin" style="border-top-color:var(--accent);"></span>生成中...';
+      try {
+        const resp = await chrome.runtime.sendMessage({ action: 'linkedinOutreach', jd, tone: selectedTone });
+        if (resp?.success && resp.message) {
+          const section = $('linkedinSection');
+          const content = $('linkedinContent');
+          if (section && content) {
+            section.style.display = 'block';
+            content.textContent = resp.message;
+          }
+          toast(greetStatus, 'LinkedIn 消息已生成', 'ok');
+        } else {
+          toast(greetStatus, resp?.error || '生成失败', 'err');
+        }
+      } catch (e) {
+        toast(greetStatus, '生成失败: ' + e.message, 'err');
+      } finally {
+        linkedinBtn.disabled = false;
+        linkedinBtn.textContent = '💼 LinkedIn';
+      }
+    });
+  }
+
+  const copyLinkedin = $('copyLinkedin');
+  if (copyLinkedin) {
+    copyLinkedin.addEventListener('click', () => {
+      const content = $('linkedinContent');
+      if (!content?.textContent) return;
+      navigator.clipboard.writeText(content.textContent).then(() => {
+        copyLinkedin.textContent = '已复制';
+        setTimeout(() => { copyLinkedin.textContent = '复制'; }, 1500);
+      });
+    });
+  }
+
+  // ====== Company Research ======
+  const companyResearchBtn = $('companyResearchBtn');
+  if (companyResearchBtn) {
+    companyResearchBtn.addEventListener('click', async () => {
+      const jd = jdInput.value.trim();
+      if (!jd) return toast(greetStatus, '请先获取 JD', 'err');
+      companyResearchBtn.disabled = true;
+      companyResearchBtn.innerHTML = '<span class="spin" style="border-top-color:var(--accent);"></span>研究中...';
+      try {
+        const resp = await chrome.runtime.sendMessage({ action: 'companyResearch', jd });
+        if (resp?.success) {
+          displayCompanyResults(resp);
+          toast(greetStatus, '公司研究完成', 'ok');
+        } else {
+          toast(greetStatus, resp?.error || '研究失败', 'err');
+        }
+      } catch (e) {
+        toast(greetStatus, '研究失败: ' + e.message, 'err');
+      } finally {
+        companyResearchBtn.disabled = false;
+        companyResearchBtn.textContent = '🏢 公司研究';
+      }
+    });
+  }
+
+  function displayCompanyResults(result) {
+    const section = $('companySection');
+    const container = $('companyResults');
+    if (!section || !container) return;
+    section.style.display = 'block';
+    let html = '';
+    if (result.companyName) html += '<div style="font-weight:600;font-size:15px;margin-bottom:6px;">' + esc(result.companyName) + '</div>';
+    const tags = [result.industry, result.size].filter(Boolean);
+    if (tags.length) {
+      html += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;">';
+      tags.forEach(t => { html += '<span class="job-card-tag">' + esc(t) + '</span>'; });
+      html += '</div>';
+    }
+    if (result.techStack?.length) {
+      html += '<div style="margin-bottom:8px;"><span style="font-weight:500;">技术栈</span></div>';
+      html += '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px;">';
+      result.techStack.forEach(t => { html += '<span class="skill-tag">' + esc(t) + '</span>'; });
+      html += '</div>';
+    }
+    if (result.culture) html += '<div style="margin-bottom:8px;"><span style="font-weight:500;">文化特点：</span>' + esc(result.culture) + '</div>';
+    if (result.pros?.length) {
+      html += '<div style="margin-bottom:8px;"><span style="font-weight:500;color:var(--green);">✅ 优势</span></div>';
+      result.pros.forEach(p => { html += '<div style="font-size:12px;padding:2px 0;">• ' + esc(p) + '</div>'; });
+    }
+    if (result.cons?.length) {
+      html += '<div style="margin-top:8px;margin-bottom:8px;"><span style="font-weight:500;color:var(--red);">⚠️ 风险</span></div>';
+      result.cons.forEach(c => { html += '<div style="font-size:12px;padding:2px 0;">• ' + esc(c) + '</div>'; });
+    }
+    if (result.interviewTips) {
+      html += '<div style="margin-top:10px;padding:8px 10px;background:var(--accent-soft);border-radius:8px;font-size:12px;">💡 <span style="font-weight:500;">面试建议：</span>' + esc(result.interviewTips) + '</div>';
+    }
+    container.innerHTML = html;
+  }
+
+  // ====== Job Evaluation ======
+  const jobEvalBtn = $('jobEvalBtn');
+  if (jobEvalBtn) {
+    jobEvalBtn.addEventListener('click', async () => {
+      const jd = jdInput.value.trim();
+      if (!jd) return toast(greetStatus, '请先获取 JD', 'err');
+      const config = await getConfig();
+      if (!config.resume?.r_name) return toast(greetStatus, '请先保存简历信息', 'err');
+      jobEvalBtn.disabled = true;
+      jobEvalBtn.innerHTML = '<span class="spin" style="border-top-color:var(--accent);"></span>评估中...';
+      try {
+        const resp = await chrome.runtime.sendMessage({ action: 'jobEvaluation', jd, resume: config.resume });
+        if (resp?.success) {
+          displayEvalResults(resp);
+          toast(greetStatus, '职位评估完成', 'ok');
+        } else {
+          toast(greetStatus, resp?.error || '评估失败', 'err');
+        }
+      } catch (e) {
+        toast(greetStatus, '评估失败: ' + e.message, 'err');
+      } finally {
+        jobEvalBtn.disabled = false;
+        jobEvalBtn.textContent = '📋 职位评估';
+      }
+    });
+  }
+
+  function displayEvalResults(result) {
+    const section = $('evalSection');
+    const container = $('evalResults');
+    if (!section || !container) return;
+    section.style.display = 'block';
+    const score = result.overallScore || 0;
+    const grade = result.overallGrade || '-';
+    const color = score >= 80 ? 'var(--green)' : score >= 60 ? '#ff9500' : 'var(--red)';
+    let html = '<div style="text-align:center;padding:8px 0;margin-bottom:10px;">';
+    html += '<span style="font-size:32px;font-weight:700;color:' + color + ';">' + esc(grade) + '</span>';
+    html += '<div style="font-size:11px;color:var(--text-tertiary);margin-top:2px;">综合评分 ' + score + '/100</div></div>';
+    if (result.dimensions?.length) {
+      result.dimensions.forEach(d => {
+        const dColor = d.score >= 80 ? 'var(--green)' : d.score >= 60 ? '#ff9500' : 'var(--red)';
+        html += '<div style="margin-bottom:8px;">';
+        html += '<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px;">';
+        html += '<span>' + esc(d.name) + ' <span style="color:var(--text-tertiary);">(' + d.weight + '%)</span></span>';
+        html += '<span style="font-weight:600;color:' + dColor + ';">' + d.score + '</span></div>';
+        html += '<div style="height:4px;background:var(--fill);border-radius:2px;overflow:hidden;">';
+        html += '<div style="height:100%;width:' + d.score + '%;background:' + dColor + ';border-radius:2px;"></div></div>';
+        if (d.comment) html += '<div style="font-size:11px;color:var(--text-secondary);margin-top:2px;">' + esc(d.comment) + '</div>';
+        html += '</div>';
+      });
+    }
+    if (result.recommendation) {
+      const recColor = score >= 60 ? 'var(--green-soft)' : 'var(--red-soft)';
+      html += '<div style="margin-top:10px;padding:10px;background:' + recColor + ';border-radius:8px;font-size:12px;line-height:1.6;">' + esc(result.recommendation) + '</div>';
+    }
+    container.innerHTML = html;
+  }
+
+  // ====== Pipeline Tracking ======
+  const addToPipelineBtn = $('addToPipeline');
+  if (addToPipelineBtn) {
+    addToPipelineBtn.addEventListener('click', async () => {
+      const jd = jdInput.value.trim();
+      if (!jd) return toast($('pipelineStatus'), '请先获取 JD', 'err');
+      const jobInfo = {};
+      let pageUrl = '';
+      try {
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        pageUrl = tab.url || '';
+        const result = await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: extractJobInfo });
+        Object.assign(jobInfo, result?.[0]?.result || {});
+      } catch (e) {}
+      chrome.storage.local.get(['pipeline'], data => {
+        const pipeline = data.pipeline || [];
+        const entry = {
+          id: Date.now(),
+          position: jobInfo.position || jd.substring(0, 30),
+          company: jobInfo.company || '',
+          salary: jobInfo.salary || '',
+          url: pageUrl,
+          status: 'interested',
+          jd: jd.substring(0, 200),
+          time: Date.now()
+        };
+        pipeline.unshift(entry);
+        chrome.storage.local.set({ pipeline: pipeline.slice(0, 100) }, () => {
+          toast($('pipelineStatus'), '已添加到求职管道', 'ok');
+          loadPipeline();
+        });
+      });
+    });
+  }
+
+  const pipelineFilter = $('pipelineFilter');
+  if (pipelineFilter) {
+    pipelineFilter.addEventListener('change', loadPipeline);
+  }
+
+  function loadPipeline() {
+    const container = $('pipelineList');
+    const filter = $('pipelineFilter');
+    if (!container) return;
+    chrome.storage.local.get(['pipeline'], data => {
+      const pipeline = data.pipeline || [];
+      const filterVal = filter?.value || 'all';
+      const filtered = filterVal === 'all' ? pipeline : pipeline.filter(p => p.status === filterVal);
+      if (!filtered.length) {
+        container.innerHTML = '<div class="history-empty">暂无' + (filterVal === 'all' ? '' : '该状态的') + '求职记录</div>';
+        return;
+      }
+      const statusMap = { interested: '感兴趣', applied: '已投递', interview: '面试中', offer: '已录取', rejected: '已拒绝' };
+      const statusColor = { interested: 'var(--accent)', applied: '#ff9500', interview: 'var(--green)', offer: '#34c759', rejected: 'var(--red)' };
+      container.innerHTML = filtered.map(item => {
+        const d = new Date(item.time);
+        const ts = d.toLocaleDateString('zh-CN');
+        const sc = statusColor[item.status] || 'var(--accent)';
+        return '<div class="history-item" data-id="' + item.id + '" style="cursor:pointer;">' +
+          '<div style="display:flex;justify-content:space-between;align-items:center;">' +
+          '<span style="font-weight:500;font-size:13px;">' + esc(item.position || '') + '</span>' +
+          '<span style="font-size:11px;padding:2px 8px;border-radius:10px;background:' + sc + '22;color:' + sc + ';">' + (statusMap[item.status] || item.status) + '</span></div>' +
+          '<div style="font-size:12px;color:var(--text-secondary);margin-top:2px;">' + esc(item.company || '') + (item.salary ? ' · ' + esc(item.salary) : '') + ' · ' + ts + '</div>' +
+          '</div>';
+      }).join('');
+
+      container.querySelectorAll('.history-item').forEach(el => {
+        el.addEventListener('click', () => {
+          const id = parseInt(el.dataset.id);
+          chrome.storage.local.get(['pipeline'], d => {
+            const p = d.pipeline || [];
+            const item = p.find(x => x.id === id);
+            if (!item) return;
+            const nextStatus = { interested: 'applied', applied: 'interview', interview: 'offer', offer: 'rejected', rejected: 'interested' };
+            const statusLabels = { interested: '感兴趣', applied: '已投递', interview: '面试中', offer: '已录取', rejected: '已拒绝' };
+            const next = nextStatus[item.status] || 'interested';
+            const label = statusLabels[next] || next;
+            if (confirm('将状态更改为「' + label + '」？')) {
+              item.status = next;
+              chrome.storage.local.set({ pipeline: p }, loadPipeline);
+            }
+          });
+        });
+      });
+    });
+  }
+
+  // Clear pipeline
+  const clearPipelineBtn = $('clearPipeline');
+  if (clearPipelineBtn) {
+    clearPipelineBtn.addEventListener('click', () => {
+      if (confirm('确定清空所有求职记录？')) {
+        chrome.storage.local.set({ pipeline: [] }, loadPipeline);
+      }
+    });
+  }
+
+  // Export pipeline
+  const exportPipelineBtn = $('exportPipeline');
+  if (exportPipelineBtn) {
+    exportPipelineBtn.addEventListener('click', () => {
+      chrome.storage.local.get(['pipeline'], data => {
+        const pipeline = data.pipeline || [];
+        if (!pipeline.length) { toast($('pipelineStatus'), '没有可导出的记录', 'err'); return; }
+        const statusMap = { interested: '感兴趣', applied: '已投递', interview: '面试中', offer: '已录取', rejected: '已拒绝' };
+        const lines = pipeline.map(item => {
+          const d = new Date(item.time);
+          return d.toLocaleDateString('zh-CN') + ' | ' + (statusMap[item.status] || item.status) + ' | ' + (item.company || '-') + ' | ' + (item.position || '-') + ' | ' + (item.salary || '-');
+        });
+        const blob = new Blob(['AI-JobHunter 求职管道\n' + '='.repeat(50) + '\n\n' + lines.join('\n')], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'pipeline-' + new Date().toISOString().slice(0, 10) + '.txt';
+        a.click();
+        URL.revokeObjectURL(url);
+        toast($('pipelineStatus'), '已导出 ' + pipeline.length + ' 条记录', 'ok');
+      });
+    });
   }
 
     // ====== History ======
